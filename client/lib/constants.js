@@ -1,4 +1,4 @@
-// lib/config.js
+// lib/constants.js
 import { defineChain } from 'viem';
 
 // --- Contract ---

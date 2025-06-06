@@ -3,7 +3,6 @@ import './globals.css';
 import '@rainbow-me/rainbowkit/styles.css';
 import { Inter } from 'next/font/google';
 import { Providers } from './providers';
-import { ThemeProvider } from 'next-themes';
 import AppHeader from './components/AppHeader'; // Create this component
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -14,9 +13,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body className="min-h-screen bg-background text-foreground flex flex-col">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <Providers>
             <AppHeader />
+            
             <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fadeIn">
               {children}
             </main>
@@ -24,7 +23,7 @@ export default function RootLayout({ children }) {
               RepuFi © {new Date().getFullYear()} - Built on PassetHub
             </footer>
           </Providers>
-        </ThemeProvider>
+       
       </body>
     </html>
   );

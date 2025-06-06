@@ -1,5 +1,6 @@
 // app/page.jsx
-import { Link } from 'next/link';
+'use client';
+import  Link  from 'next/link';
 import { ShieldCheck, Users, Handshake, TrendingUp, Github } from 'lucide-react';
 
 export default function HomePage() {
