@@ -1,8 +1,11 @@
 # 💡 RepuFi – Rent-a-Reputation
 
-A decentralized system where trusted users can vouch for others by staking tokens, creating an on-chain reputation lending market.
+A decentralized system where trusted users can vouch for others by staking tokens, creating an on-chain reputation lending market, powered by GitHub insights and built on the PassetHub Testnet.
 
----
+## 🚀 Live Demo
+
+🔗 **Live Application:** [**Click here**](https://repufi.vercel.app)
+
 
 ## 🧩 Core Flow
 
@@ -14,7 +17,6 @@ A decentralized system where trusted users can vouch for others by staking token
 - 🧔‍♂ **Backer (Vouch-er)**  
   A trusted user with provable rep on platforms like Gitcoin, Lens, GitHub, etc.
 
----
 
 ### 2. The Vouch Flow
 
@@ -40,7 +42,6 @@ A decentralized system where trusted users can vouch for others by staking token
 
 The borrower now holds this **VouchNFT** as a verifiable badge of trust.
 
----
 
 ### 3. Outcome Scenarios
 
@@ -53,7 +54,6 @@ The borrower now holds this **VouchNFT** as a verifiable badge of trust.
 - Smart contract **slashes** the staked DOT  
 - RepuFi mints a **WarningNFT** to record the failed pair
 
----
 
 ## 🔐 Smart Contract Logic
 
@@ -65,42 +65,38 @@ The borrower now holds this **VouchNFT** as a verifiable badge of trust.
 | Slashing Logic  | Triggered by external API or DAO admin vote                          |
 | Withdraw Flow   | `releaseStake()` after expiry, if no negative reports exist          |
 
----
 
-## 🎁 Features to Build in a Hackathon
+## ✨ Key Features Implemented
 
-### ✅ MVP
-- Polkadot.js wallet integration  
-- Select borrower + stake DOT  
-- Mint `VouchNFT` with on-chain metadata  
-- Borrower dashboard showing who vouched and how much  
-- Admin-triggered slash logic + WarningNFT flow  
+-   **PassetHub Testnet Integration:** Fully configured for interactions with the PassetHub Testnet.
+-   **GitHub Reputation Scoring:**
+    -   Backers analyze their GitHub profiles via a Next.js API route.
+    -   A weighted score (DRS) is calculated based on public repos, followers, stars, activity, etc.
+    -   Minimum score required to act as a Backer.
+-   **On-Chain Vouching with SBTs:**
+    -   Backers stake PAS to create vouches.
+    -   ERC721 Soul-Bound Tokens (SBTs) are minted for both Backer and Borrower.
+    -   Metadata (including GitHub score snapshot and a custom SVG image) is stored on IPFS via Pinata.
+-   **Core Smart Contract Functions:** `createVouch`, `releaseStake`, `slashStake` (admin), `forceExpire` (admin).
 
-### 🔥 Advanced Ideas
-- Real-time reputation scores from GitHub/Gitcoin/Lens  
-- Reputation leaderboard  
-- "Rep Streaks" — consistent, multi-user vouching  
-- “Trust Marketplace” — vouch for others in return for a % reward  
 
----
+## PassetHub TestNet :
 
-## 🚀 Tech Stack
-- **Smart Contracts:** Solidity (Polkadot AssetHub EVM)
-- **Frontend:** Next.js + Wagmi + Polkadot.js Extension
-- **Chain:** Polkadot AssetHub / Astar / Moonbeam (EVM-compatible)
-- **NFTs:** ERC721 for `VouchNFT` and `WarningNFT`
+- [Faucet](https://faucet.polkadot.io/?parachain=1111)
+- Testnet details:
+* Network name: PassetHub
+* Chain ID: 420420421
+* RPC URL: https://testnet-passet-hub-eth-rpc.polkadot.io
+* Currency: PAS
+* Block Explorer URL: https://blockscout-passet-hub.parity-testnet.parity.io/
 
----
+## 🔮 Future Enhancements & Ideas
 
-## 📜 License
-MIT License
+-   **"Rep Streaks":** Reward consistent and successful vouching/borrowing.
+-   **Trust Marketplace:** Allow backers to offer vouching services for a fee/reward percentage.
+-   **Integration with More Reputation Sources:** Gitcoin Passport, Lens Protocol, on-chain activity.
+-   **Advanced SBT Functionality:** SBTs could unlock specific platform features or DAO voting rights.
 
----
-
-## 🙌 Contributing
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
----
 
 ## 📢 Contributors
 
@@ -134,5 +130,4 @@ Pull requests are welcome. For major changes, please open an issue first to disc
   </tr>
 </table>
 
----
 
