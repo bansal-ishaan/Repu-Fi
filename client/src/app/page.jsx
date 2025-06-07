@@ -83,7 +83,7 @@ export default function HomePage() {
                 <div className="text-center">
                   <div className="h-20 w-20 mx-auto mb-4 rounded-full overflow-hidden">
                     <img
-                      src="https://avatars.githubusercontent.com/u/59930810?s=200&v=4"
+                      src="https://polkadot.com/favicon/android-chrome-512x512.png"
                       alt="PassetHub/Polkadot"
                       className="w-full h-full object-cover"
                     />
