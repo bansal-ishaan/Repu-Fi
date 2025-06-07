@@ -50,7 +50,6 @@ export default function FAQPage() {
 
         <FAQItem question="Can anyone just enter someone else's GitHub username to become a Backer?">
             <div className="flex items-start space-x-3">
-                <AlertTriangle className="h-8 w-8 text-orange-500 flex-shrink-0 mt-1" />
                 <div>
                     <p>
                         This is a valid concern for a system aiming for high trust. In the current MVP:
@@ -63,18 +62,16 @@ export default function FAQPage() {
                             The VouchSBT metadata includes this claimed GitHub username and the associated score. This information is public and transparent.
                         </li>
                         <li>
-                            **Verification & Mitigation (MVP):** While the smart contract itself doesn't perform cryptographic verification of GitHub ownership (which would require a complex oracle or identity system), the transparency of the system allows for social verification. If a Borrower or another party suspects a Backer has falsely claimed a GitHub profile:
+                            Verification & Mitigation : While the smart contract itself doesn't perform verification of GitHub ownership . If a Borrower or another party suspects a Backer has falsely claimed a GitHub profile:
                             <ul className="list-circle list-inside ml-4 mt-1 space-y-1">
                                 <li>They can report it to the RepuFi DAO/Admin.</li>
-                                <li>The Admin (contract owner) has the authority to investigate. If misuse is confirmed (e.g., the claimed GitHub profile owner denies association with the Backer's Ethereum address), the Admin can use the `forceExpire` function on any vouches made by that fraudulent Backer. This would burn the associated VouchSBTs and potentially allow staked funds to be handled appropriately (though `forceExpire` itself doesn't release stake, `slashStake` would be for fund handling in case of fraud).</li>
+                                <li>The Admin contract owner has the authority to investigate. If misuse is confirmed , the Admin can slash expire on any vouches made by that fraudulent Backer. This would burn the associated VouchSBTs and potentially allow staked funds to be handled appropriately .</li>
                             </ul>
                         </li>
                         <li>
-                            **Gas Efficiency:** The current model (analyzing GitHub off-chain via an API route and storing a snapshot on IPFS) is significantly more gas-efficient than attempting any form of direct on-chain GitHub data fetching or complex verification, making the system more accessible on networks like PassetHub.
+                            Gas Efficiency: The current mvp is significantly more gas-efficient than attempting any form of direct on-chain GitHub data fetching or complex verification, making the system more accessible on networks like PassetHub.
                         </li>
-                        <li>
-                            **Future Enhancements:** More robust, decentralized identity solutions (like signing a message with the ETH address that is then posted to a Gist on the claimed GitHub account, verified by an oracle, or using DIDs/VCs) are planned for future iterations to strengthen this link.
-                        </li>
+                        
                     </ul>
                 </div>
             </div>
