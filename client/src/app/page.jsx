@@ -10,7 +10,7 @@ export default function HomePage() {
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-6">
           Repu<span className="text-primary">Fi</span>: <span className="block sm:inline">Decentralized Reputation</span>
         </h1>
-        <p className="max-w-2xl mx-auto text-lg sm:text-xl text-slate-600 dark:text-slate-300 mb-8">
+        <p className="max-w-2xl mx-auto text-lg sm:text-xl text-slate-600 dark:text-slate-500 mb-8">
           Stake your credibility, empower new talent. An on-chain reputation lending market on PassetHub.
         </p>
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
@@ -76,7 +76,7 @@ export default function HomePage() {
             <div className="bg-muted p-8 rounded-xl">
               <div className="flex items-center justify-center space-x-8">
                 <div className="text-center">
-                  <Github className="h-20 w-20 mx-auto mb-4 text-slate-700 dark:text-slate-300" />
+                  <Github className="h-20 w-20 mx-auto mb-4 text-slate-700 dark:text-slate-500" />
                   <p className="font-medium">GitHub</p>
                 </div>
                 <div className="text-4xl font-light">+</div>

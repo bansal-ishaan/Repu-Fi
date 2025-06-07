@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, ShieldCheck, Users, Handshake } from 'lucide-react'; // Icons
+import { Sun, Moon, ShieldCheck, Users, Handshake,HelpCircle } from 'lucide-react'; // Icons
 import { useAccount } from 'wagmi';
 import { useEffect, useState } from 'react';
 
@@ -25,6 +25,9 @@ export default function AppHeader() {
         <nav className="hidden md:flex items-center space-x-6 text-sm font-medium flex-grow">
           <Link href="/become-backer" className="transition-colors hover:text-primary">Become a Backer</Link>
           {isConnected && <Link href="/my-vouches" className="transition-colors hover:text-primary">My Vouches</Link>}
+          <Link href="/faq" className="transition-colors hover:text-primary px-2 py-1 rounded-md flex items-center">
+            <HelpCircle size={16} className="mr-1.5"/> FAQ
+          </Link>
           <Link href="/explore" className="transition-colors hover:text-primary">Explore Vouches</Link>
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-4">
