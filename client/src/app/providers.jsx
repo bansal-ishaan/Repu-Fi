@@ -5,6 +5,7 @@ import { RainbowKitProvider, getDefaultWallets, getDefaultConfig, darkTheme, lig
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
+import { ThemeProvider } from 'next-themes';
 // Assuming constants.js is in lib at the root of your project
 import { passetHubTestnet } from '../../lib/constants'; // Use Next.js path alias
 
@@ -44,12 +45,14 @@ export function Providers({ children }) {
   return (
     <WagmiProvider config={currentWagmiConfig}> {/* Use the state variable here */}
       <QueryClientProvider client={queryClient}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <RainbowKitProvider
           theme={resolvedTheme === 'dark' ? darkTheme() : lightTheme()}
           modalSize="compact"
         >
           {children}
         </RainbowKitProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );
