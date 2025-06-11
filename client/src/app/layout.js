@@ -16,7 +16,7 @@ export default function RootLayout({ children }) {
           <Providers>
             <AppHeader />
             
-            <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fadeIn">
+            <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8 ">
               {children}
             </main>
             <footer className="text-center py-6 border-t border-border text-sm text-muted-foreground">

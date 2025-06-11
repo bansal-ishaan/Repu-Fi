@@ -1,9 +1,9 @@
 // app/page.jsx
-'use client';
 import  Link  from 'next/link';
 import { ShieldCheck, Users, Handshake, TrendingUp, Github ,ArrowRight} from 'lucide-react';
 import { Button } from './components/ui/Button'; 
-export default function HomePage() {
+export default  async function HomePage() {
+  await new Promise(resolve => setTimeout(resolve, 1800)); // Simulate server-side delay
   return (
     <div className="space-y-12">
       <section className="text-center py-12 bg-gradient-to-br from-primary/10 to-secondary/10 dark:from-primary/20 dark:to-secondary/20 rounded-xl shadow-inner">
