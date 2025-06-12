@@ -1,3 +1,4 @@
+
 // app/become-backer/page.jsx
 'use client'; // This page now heavily relies on client-side state
 import { useState } from 'react';
@@ -6,7 +7,7 @@ import GitHubAnalyzerClient from '../components/GitHubAnalyzerClient';
 import CreateVouchForm from '../components/CreateVouchForm';
 import { ShieldAlert, LockKeyhole } from 'lucide-react';
 
-export default function BecomeBackerPage() {
+export default  function BecomeBackerPage() {
   const { isConnected } = useAccount();
   const [githubAnalysisData, setGithubAnalysisData] = useState(null);
 
@@ -53,4 +54,5 @@ export default function BecomeBackerPage() {
       )}
     </div>
   );
+
 }
