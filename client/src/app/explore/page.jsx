@@ -11,6 +11,7 @@ export default function ExplorePage() {
     // The page itself can remain a Server Component if all dynamic logic is in ExploreVouchesClient
     <div>
       <ExploreVouchesClient />
+      
     </div>
   );
 }

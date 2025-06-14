@@ -32,6 +32,9 @@
     --input-border-hsl: 214.3 31.8% 91.4%; /* Specific for input border */
     --ring-hsl: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+     --primary-glow-hsl: 221.2 83.2% 53.3%; /* Same as primary */
+    --secondary-glow-hsl: 210 40% 96.1%;   /* A light blue/gray for the other end of the gradient */
+    --dark-card-hsl: 0 0% 100%; 
   }
 
   .dark {
@@ -45,6 +48,9 @@
     --border-hsl: 217.2 32.6% 17.5%;
     --input-border-hsl: 217.2 32.6% 17.5%;
     --ring-hsl: 224.3 76.5% 48%;
+     --primary-glow-hsl: 217.2 91.2% 59.8%;   /* Use the brighter dark-mode primary */
+    --secondary-glow-hsl: 215 80% 55%;        /* A nice contrasting blue for the gradient */
+    --dark-card-hsl: 224 71% 4%;
   }
 
   body {
@@ -169,9 +175,102 @@
   .animate-fadeIn {
     animation: fadeIn 0.5s ease-in-out forwards;
   }
+
+  .text-gradient {
+    /* The gradient uses your primary color variable */
+    background: linear-gradient(
+      to right,
+      hsl(var(--primary-hsl)),
+      hsl(var(--foreground-hsl)),
+      hsl(var(--primary-hsl))
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-fill-color: transparent;
+    animation: gradient-text-flow 5s ease infinite;
+    background-size: 200% 200%;
+  }
+
+  .card-gradient-border {
+    position: relative;
+    /* Uses the --dark-card-hsl variable we defined earlier */
+    background-color: hsl(var(--dark-card-hsl) / 0.6); /* Add some transparency */
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px); /* Frosted glass effect */
+    border-radius: 1rem; /* A bit more rounded for a modern look (2xl) */
+  }
+
+  .card-gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: -1.5px; /* Controls the 'thickness' of the border */
+    border-radius: inherit; /* Matches the parent's border-radius */
+    /* Creates the gradient using our new glow variables */
+    background: linear-gradient(
+      135deg,
+      hsl(var(--primary-glow-hsl) / 0.5), /* Use HSL with alpha for glow */
+      hsl(var(--secondary-glow-hsl) / 0.5)
+    );
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.4s ease-in-out;
+  }
+  .card-gradient-border:hover::before {
+    opacity: 1;
+  }
+
 }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px 2px currentColor;
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 12px 3px currentColor;
+  }
+}
+
+@layer utilities {
+  /* ... your existing utilities if any ... */
+  
+  /* Pulsing Glow for Status Indicators */
+  .animate-pulse-glow {
+    animation: pulse-glow 2.5s infinite ease-in-out;
+  }
+
+  /* You can add custom scrollbar styles here too if you like */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--dark-card-hsl));
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border-hsl));
+    border-radius: 10px;
+    border: 2px solid hsl(var(--dark-card-hsl));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--primary-hsl));
+  }
+  @keyframes aurora {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  .animate-aurora {
+    animation: aurora 30s linear infinite;
+  }
+}
+
