@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RepuFi SBT Viewer</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <h1>My RepuFi Vouch SBTs</h1>
+        <div class="input-group">
+            <input type="text" id="walletAddress" placeholder="Enter your 0x... address">
+            <button id="fetchButton">Fetch SBTs</button>
+        </div>
+        <div id="nft-gallery">
+            <!-- NFT cards will be injected here by JavaScript -->
+            <p class="notice">Enter your address to see your SBTs.</p>
+        </div>
+    </div>
+    <script src="ethers.min.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>
