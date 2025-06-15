@@ -189,7 +189,7 @@ export default function AppHeader() {
           <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-4">
             <div className="hidden sm:flex items-center gap-3">{mounted && <AuthButton />}<GitHubScoreDisplay /></div>
             <CustomConnectButton />
-            {mounted && <Tooltip content={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} position="bottom"><button onClick={toggleTheme} className="p-2.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" aria-label="Toggle theme">{theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}</button></Tooltip>}
+            {/* {mounted && <Tooltip content={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} position="bottom"><button onClick={toggleTheme} className="p-2.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" aria-label="Toggle theme">{theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}</button></Tooltip>} */}
           </div>
         </div>
       </header>

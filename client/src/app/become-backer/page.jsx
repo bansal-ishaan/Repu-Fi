@@ -173,13 +173,14 @@ const RequestCard = ({ req, handleOpenVouchModal }) => {
                 size={14}
                 className="inline-block ml-1 transition-transform group-hover/link:translate-x-0.5"
               />
+               </a>
               <Button
             onClick={() => handleOpenVouchModal(req)}
             className="btn-secondary ml-10 !bg-cyan-600 hover:!bg-cyan-500 !text-white !px-4 !py-2 whitespace-nowrap"
           >
             <UserPlus size={16} className="mr-1.5" /> Vouch
           </Button>
-            </a>
+           
           </div>
         )}
       </div>
