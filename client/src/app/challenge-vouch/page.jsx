@@ -9,7 +9,7 @@ import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
 import { Loader2, ShieldQuestion, LockKeyhole } from 'lucide-react';
 
-const CHALLENGE_STAKE_PAS = 15; 
+const CHALLENGE_STAKE_PAS = 0.0015; 
 
 export default function ChallengeVouchPage() {
   const { address: connectedAddress, isConnected } = useAccount();

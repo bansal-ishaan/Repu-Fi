@@ -7,16 +7,16 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract RepuFiSBT is ERC721, Ownable, ReentrancyGuard {
     // Constants
-    uint256 public constant REPUTATION_REQUEST_FEE = 10;
+    uint256 public constant REPUTATION_REQUEST_FEE = 0.0001 ether;
     uint256 public constant MIN_GITHUB_SCORE = 7;
-    uint256 public constant CHALLENGE_STAKE = 15;
+    uint256 public constant CHALLENGE_STAKE = 0.0015 ether;
     
     // Struct to store vouch information
     struct Vouch {
         address backer;
         address borrower;
         uint128 amount;         // Staked ETH amount (wei)
-        uint64 expiry;          // Expiration timestamp
+        uint256 expiry;          // Expiration timestamp
         bool withdrawn;         // Whether stake has been withdrawn
         uint256 pairedTokenId;  // Linked token ID
         bool forceExpired;      // Admin-forced expiration
@@ -185,10 +185,12 @@ contract RepuFiSBT is ERC721, Ownable, ReentrancyGuard {
 
     // ===================== Challenge Functions =====================
     function createChallenge(uint256 vouchTokenId, string calldata challengeReason) external payable {
+        require(_exists(vouchTokenId) ,"Token doesnt exist" );
         if (msg.value < CHALLENGE_STAKE) revert InsufficientStake();
+        
 
-        // Vouch storage vouch = vouches[vouchTokenId];
-        // if (vouch.withdrawn || isExpired(vouchTokenId)) revert("Cannot challenge expired/withdrawn vouch");
+        Vouch storage vouch = vouches[vouchTokenId];
+        if (vouch.withdrawn || vouch.forceExpired) revert("Cannot challenge expired/withdrawn vouch");
 
         uint256 challengeId = ++challengeCounter;
         challenges[challengeId] = Challenge({
@@ -265,7 +267,7 @@ contract RepuFiSBT is ERC721, Ownable, ReentrancyGuard {
             backer: msg.sender,
             borrower: borrower,
             amount: uint128(msg.value),
-            expiry: uint64(expiry),
+            expiry: (expiry),
             withdrawn: false,
             pairedTokenId: borrowerTokenId,
             forceExpired: false,
@@ -276,7 +278,7 @@ contract RepuFiSBT is ERC721, Ownable, ReentrancyGuard {
             backer: msg.sender,
             borrower: borrower,
             amount: uint128(msg.value),
-            expiry: uint64(expiry),
+            expiry: (expiry),
             withdrawn: false,
             pairedTokenId: backerTokenId,
             forceExpired: false,
@@ -388,10 +390,10 @@ contract RepuFiSBT is ERC721, Ownable, ReentrancyGuard {
     }
 
     // View functions
-    function isExpired(uint256 tokenId) public view returns (bool) {
-        require(_exists(tokenId), "Invalid token");
-        Vouch storage v = vouches[tokenId];
-        return block.timestamp > v.expiry || v.forceExpired;
+    
+    function isExpired(uint256 tokenId) public view returns(bool){
+        require(_exists(tokenId),"Token doesnt exist");
+        return block.timestamp >= vouches[tokenId].expiry;
     }
 
     function getVouchDetails(uint256 tokenId) external view returns (Vouch memory) {
@@ -429,22 +431,5 @@ contract RepuFiSBT is ERC721, Ownable, ReentrancyGuard {
         return tokenOwners[tokenId];
     }
 
-    function approve(address, uint256) public pure override {
-        revert("Approvals disabled");
-    }
 
-    function setApprovalForAll(address, bool) public pure override {
-        revert("Approvals disabled");
-    }
-
-    // Admin functions
-    function setMaxDuration(uint256 newDuration) external onlyOwner {
-        maxDuration = newDuration;
-        emit MaxDurationUpdated(newDuration);
-    }
-
-    // Emergency functions
-    function emergencyWithdraw() external onlyOwner {
-        payable(owner()).transfer(address(this).balance);
-    }
 }

@@ -1029,8 +1029,7 @@ export const REPUFI_SBT_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_UPGRAD_REPUFI
 // 	}
 // ]; // Crucial: Paste your contract ABI
 
-export const REPUFI_SBT_ABI =[
-
+export const REPUFI_SBT_ABI = [
 	{
 		"inputs": [
 			{
@@ -1058,6 +1057,24 @@ export const REPUFI_SBT_ABI =[
 		"inputs": [],
 		"name": "AlreadyProcessed",
 		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "approve",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
 	},
 	{
 		"inputs": [],
@@ -1397,13 +1414,6 @@ export const REPUFI_SBT_ABI =[
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "emergencyWithdraw",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -1640,6 +1650,24 @@ export const REPUFI_SBT_ABI =[
 		"inputs": [
 			{
 				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"internalType": "bool",
+				"name": "approved",
+				"type": "bool"
+			}
+		],
+		"name": "setApprovalForAll",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
 				"name": "user",
 				"type": "address"
 			},
@@ -1650,19 +1678,6 @@ export const REPUFI_SBT_ABI =[
 			}
 		],
 		"name": "setGitHubScore",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "newDuration",
-				"type": "uint256"
-			}
-		],
-		"name": "setMaxDuration",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -1887,24 +1902,6 @@ export const REPUFI_SBT_ABI =[
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "approve",
-		"outputs": [],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "owner",
 				"type": "address"
 			}
@@ -2061,9 +2058,9 @@ export const REPUFI_SBT_ABI =[
 						"type": "uint128"
 					},
 					{
-						"internalType": "uint64",
+						"internalType": "uint256",
 						"name": "expiry",
-						"type": "uint64"
+						"type": "uint256"
 					},
 					{
 						"internalType": "bool",
@@ -2339,24 +2336,6 @@ export const REPUFI_SBT_ABI =[
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			},
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"name": "setApprovalForAll",
-		"outputs": [],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "bytes4",
 				"name": "interfaceId",
 				"type": "bytes4"
@@ -2549,9 +2528,9 @@ export const REPUFI_SBT_ABI =[
 				"type": "uint128"
 			},
 			{
-				"internalType": "uint64",
+				"internalType": "uint256",
 				"name": "expiry",
-				"type": "uint64"
+				"type": "uint256"
 			},
 			{
 				"internalType": "bool",

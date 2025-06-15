@@ -13,7 +13,7 @@ import GitHubAnalyzerClient from '../components/GitHubAnalyzerClient'; // To get
 import Link from 'next/link';
 
 const MIN_GITHUB_SCORE_CONTRACT = 7; // Minimum score to request reputation
-const REPUTATION_REQUEST_FEE_PAS = 10; // Fee in PAS for reputation request
+const REPUTATION_REQUEST_FEE_PAS = 0.0001; // Fee in PAS for reputation request
 
 export default function RequestReputationPage() {
   const { address: connectedAddress, isConnected } = useAccount();
