@@ -63,7 +63,7 @@ export default function RequestReputationPage() {
     }
   }, [sessionStatus, session, scoreData, isFetchingScore, refreshScore]);
 
-  const handleSubmit = async (e) => {
+   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError(null); setFormMessage(null);
     resetWriteContract();
@@ -71,16 +71,13 @@ export default function RequestReputationPage() {
     if (!isConnected || !connectedAddress) {
       setFormError('Please connect your wallet to submit a request.'); return;
     }
-    if (sessionStatus !== 'authenticated' || !session?.user?.githubUsername) {
-      setFormError('Please log in with GitHub (via header) to use your profile for the request.'); return;
+    // scoreData is manualAnalysisData || scoreDataFromContext
+    if (!scoreData || scoreData.totalScore === undefined) {
+      setFormError('A GitHub score (either from your login or manual input) must be analyzed first.'); return;
     }
-    if (!scoreData || typeof scoreData.totalScore !== 'number') {
-      setFormError('Your GitHub score is not available or still loading. Please wait or retry.'); return;
+    if (scoreData.totalScore >= (MIN_GITHUB_SCORE_CONTRACT / 10.0) ) { // Compare with 0-10 scale
+      setFormError(`Score for ${scoreData.username} (${scoreData.totalScore.toFixed(1)}) is >= ${MIN_GITHUB_SCORE_CONTRACT / 10.0}. User can be a backer.`); return;
     }
-    if (scoreData.totalScore >= actualMinScoreThreshold) {
-      setFormError(`Your GitHub score (${scoreData.totalScore.toFixed(1)}) is ${actualMinScoreThreshold} or higher. You are eligible to be a backer directly.`); return;
-    }
-    // Form field validations
     if (!requestType.trim()) { setFormError('Request type is required.'); return; }
     if (!description.trim()) { setFormError('Description is required.'); return; }
     const parsedDurationDays = parseInt(durationDays);
@@ -91,31 +88,31 @@ export default function RequestReputationPage() {
     setFormMessage('Preparing reputation request...');
     try {
       const durationInSeconds = BigInt(parsedDurationDays * 24 * 60 * 60);
-      // Score to be sent to contract (e.g., 6.9 -> 69)
       const githubScoreForContract = BigInt(Math.floor(scoreData.totalScore * 10));
 
       setFormMessage('Uploading request metadata to IPFS...');
       const requestMetadata = {
-        name: `Reputation Vouch Request: ${requestType}`,
-        description: `User ${connectedAddress} (GitHub: ${scoreData.username}, Score: ${scoreData.totalScore.toFixed(1)}) requests a vouch for "${requestType}". Reason: ${description}`,
-        external_url: `https://github.com/${scoreData.username}`,
+        name: `Reputation Vouch Request: ${requestType} by ${scoreData.username || connectedAddress.substring(0,6)}`, // Use GitHub username if available
+        description: `User ${connectedAddress} (GitHub Profile: ${scoreData.username || 'Not Provided'}, Analyzed Score: ${scoreData.totalScore.toFixed(1)}) is requesting a vouch for "${requestType}". Reason: ${description}`,
+        external_url: scoreData.username ? `https://github.com/${scoreData.username}` : `https://yourdapp.com/user/${connectedAddress}`, // Example external URL
+        // You could add an image for the request itself if desired
+        // image: "ipfs://<CID_of_request_placeholder_image>"
         attributes: [
-          { trait_type: "Requester Address", value: connectedAddress },
-          { trait_type: "GitHub Username", value: scoreData.username },
-          { trait_type: "GitHub Score (Analyzed)", value: scoreData.totalScore.toFixed(1) },
+          { trait_type: "Requester Wallet Address", value: connectedAddress },
+          // --- ADDED/MODIFIED ---
+          { trait_type: "Requester GitHub Username", value: scoreData.username || "Not Specified" },
+          { trait_type: "Requester Analyzed GitHub Score", value: scoreData.totalScore.toFixed(1) },
+          // --- END ADDED/MODIFIED ---
           { trait_type: "GitHub Score (Sent to Contract)", value: githubScoreForContract.toString() },
           { trait_type: "Request Type", value: requestType },
-          { trait_type: "Requested Duration", value: `${parsedDurationDays} days` },
+          { trait_type: "Requested Vouch Duration", value: `${parsedDurationDays} days` },
+          { trait_type: "Request Description Summary", value: description.substring(0, 100) + (description.length > 100 ? "..." : "") },
         ],
       };
       const metadataCID = await uploadJsonToIPFS(requestMetadata);
-      setFormMessage(`Metadata uploaded. Submitting transaction (Fee: ${displayFeeString})...`);
+      setFormMessage(`Metadata uploaded (CID: ${metadataCID.substring(0,10)}...). Submitting request...`);
 
-      console.log("Calling createReputationRequest with args:", {
-          requestType, description, durationInSeconds: durationInSeconds.toString(),
-          metadataCID, borrowerGithubScore: githubScoreForContract.toString(),
-          value: feeInWei.toString()
-      });
+      console.log("Calling createReputationRequest with args:", { /* ... */ });
 
       writeContract({
         address: REPUFI_SBT_CONTRACT_ADDRESS,
