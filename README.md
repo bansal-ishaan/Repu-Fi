@@ -1,102 +1,134 @@
 # 💡 RepuFi – Rent-a-Reputation
 
-A decentralized system where trusted users can vouch for others by staking tokens, creating an on-chain reputation lending market, powered by GitHub insights and built on the PassetHub Testnet.
+**RepuFi** is a decentralized reputation lending protocol where **trusted users (Backers)** can vouch for **low-rep users (Borrowers)** by staking PAS tokens and issuing on-chain **SoulBound Tokens (SBTs)**. This builds a trust layer for Web3 platforms like DAOs, grant programs, and job portals.
 
-## 🚀 Live Demo
+🔗 **Live Demo:** [https://repufi.vercel.app](https://repufi.vercel.app)  
+🔗 **Job Portal Integration:** [https://jobportal-eosin-eta.vercel.app](https://jobportal-eosin-eta.vercel.app)
 
-🔗 **Live Application:** [**Click here**](https://repufi.vercel.app)
+---
 
+## 🧠 Core Philosophy
 
-## 🧩 Core Flow
+### 🔍 AI-Powered Reputation
 
-### 1. Two Roles
+- RepuFi uses an **AI-based reputation scoring engine** that analyzes **11 GitHub profile features**:
+  - Followers
+  - Following
+  - Public repos
+  - Stars received
+  - Forks
+  - Contributions
+  - Commit history
+  - Gists
+  - Activity frequency
+  - Account age
+  - Recent activity streak
 
-- 🧑‍🎓 **Borrower**  
-  A new user with low or no on-chain reputation.
+- A **GitHub score (0–10)** is generated:
+  - 📉 **< 7** → *Low rep (Borrower)*
+  - 📈 **≥ 7** → *High rep (Backer)*
 
-- 🧔‍♂ **Backer (Vouch-er)**  
-  A trusted user with provable rep on platforms like Gitcoin, Lens, GitHub, etc.
+---
 
+## 🧩 How RepuFi Works
 
-### 2. The Vouch Flow
+### 👥 Two User Roles
 
-#### Use Cases for Borrowers:
-- Apply for grant platforms  
-- Access whitelist DAO roles  
-- Request micro-loans  
-- Get a “Verified Builder” badge  
-- And more...
+| Role       | Description |
+|------------|-------------|
+| 👨‍🎓 **Borrower** | A new user with low reputation who wants to gain trust in Web3. |
+| 👨‍🔬 **Backer**   | A reputed user who vouches by staking tokens and issuing a trust badge (SBT). |
 
-#### What Backers Do:
-1. Connect wallet to RepuFi.
-2. Select a borrower.
-3. Stake a chosen amount of DOT as trust collateral.
-4. RepuFi fetches their on-chain reputation score.
-5. The system mints a **VouchNFT** on **Polkadot AssetHub** with:
-   - 🪪 Backer’s address  
-   - 👤 Borrower’s address  
-   - 🔒 Staked DOT amount  
-   - 📜 Reason (e.g., “DAO contributor role”)  
-   - ⌛ Expiry (30 days)  
-   - 🧠 Reputation metadata (Gitcoin, GitHub, etc.)
+---
 
-The borrower now holds this **VouchNFT** as a verifiable badge of trust.
+## 🔁 Vouch + Challenge Flow
 
+### 1. Backer Vouches for Borrower
 
-### 3. Outcome Scenarios
+- Backer connects wallet
+- Chooses a borrower (with GitHub score < 7)
+- Stakes PAS tokens as a **trust guarantee**
+- RepuFi mints a **VouchNFT (SBT)** to both:
+  - Backer and Borrower wallets
+  - Metadata includes:
+    - 🪪 Backer and Borrower address
+    - 📜 Reason for vouching
+    - 💰 Staked PAS amount
+    - 📊 GitHub score snapshot
+    - ⏳ Expiry date (30 days)
+    - 🖼️ SVG badge image
+    - 🧠 AI-reputation metadata (via Pinata/IPFS)
 
-#### ✅ If Borrower Succeeds:
-- e.g., gets a grant → submits work → DAO approves  
-- Smart contract **returns staked DOT** to the backer  
-- Optionally, **rewards the backer**
+### 2. Borrower Uses the SBT
 
-#### ❌ If Borrower Fails or Is Inactive:
-- Smart contract **slashes** the staked DOT  
-- RepuFi mints a **WarningNFT** to record the failed pair
+- Borrower uses the SBT to:
+  - Apply for grants
+  - Access exclusive DAOs
+  - Get verified badges
+  - Request micro-loans
+  - Apply for jobs
 
+### 3. Third-Party Challenge (New Feature)
 
-## 🔐 Smart Contract Logic
+- Any user can **challenge** a Borrower if they suspect fraud
+- Admin reviews:
+  - ✅ If challenge is **valid**:
+    - Backer’s stake is **slashed**
+  - ❌ If challenge is **invalid**:
+    - Stake remains locked until expiry
 
-| Feature         | Logic                                                                 |
-|-----------------|-----------------------------------------------------------------------|
-| Stake Vouch     | `vouchFor(address borrower, uint amount, string reason)`             |
-| NFT Minting     | Mints `VouchNFT` on AssetHub with full metadata                      |
-| Expiry Limit    | Maximum vouch duration: **30 days**                                  |
-| Slashing Logic  | Triggered by external API or DAO admin vote                          |
-| Withdraw Flow   | `releaseStake()` after expiry, if no negative reports exist          |
+---
 
+## 🧠 Smart Contract Logic
 
-## ✨ Key Features Implemented
+| Function           | Description                                                  |
+|--------------------|--------------------------------------------------------------|
+| `createVouch()`    | Backer stakes PAS and mints the Vouch SBT                    |
+| `releaseStake()`   | Backer withdraws stake after expiry if no valid challenges   |
+| `slashStake()`     | Admin slashes the stake on confirmed fraud/challenge         |
 
--   **PassetHub Testnet Integration:** Fully configured for interactions with the PassetHub Testnet.
--   **GitHub Reputation Scoring:**
-    -   Backers analyze their GitHub profiles via a Next.js API route.
-    -   A weighted score (DRS) is calculated based on public repos, followers, stars, activity, etc.
-    -   Minimum score required to act as a Backer.
--   **On-Chain Vouching with SBTs:**
-    -   Backers stake PAS to create vouches.
-    -   ERC721 Soul-Bound Tokens (SBTs) are minted for both Backer and Borrower.
-    -   Metadata (including GitHub score snapshot and a custom SVG image) is stored on IPFS via Pinata.
--   **Core Smart Contract Functions:** `createVouch`, `releaseStake`, `slashStake` (admin), `forceExpire` (admin).
+✅ **Soulbound** — VouchNFTs are **non-transferable**  
+📁 **On-chain** — All vouches recorded on PassetHub Testnet  
+🌐 **Metadata** — GitHub score snapshot and custom SVG stored on **Pinata/IPFS**
 
+---
 
-## PassetHub TestNet :
+## 🔐 Deployment Details
 
-- [Faucet](https://faucet.polkadot.io/?parachain=1111)
-- Testnet details:
-* Network name: PassetHub
-* Chain ID: 420420421
-* RPC URL: https://testnet-passet-hub-eth-rpc.polkadot.io
-* Currency: PAS
-* Block Explorer URL: https://blockscout-passet-hub.parity-testnet.parity.io/
+- **Network:** PassetHub Testnet (Polkadot ecosystem)
+- **SBT Contract Address:**  
+  [`0x3a02d771336d524ad9e48ef9b9f6cb24a320a516`](https://blockscout-passet-hub.parity-testnet.parity.io/address/0x3a02d771336d524ad9e48ef9b9f6cb24a320a516)
 
-## 🔮 Future Enhancements & Ideas
+| Parameter        | Value                                                                 |
+|------------------|-----------------------------------------------------------------------|
+| Chain ID         | `420420421`                                                           |
+| RPC URL          | `https://testnet-passet-hub-eth-rpc.polkadot.io`                     |
+| Block Explorer   | [Blockscout](https://blockscout-passet-hub.parity-testnet.parity.io) |
+| Faucet           | [Request PAS](https://faucet.polkadot.io/?parachain=1111)            |
 
--   **"Rep Streaks":** Reward consistent and successful vouching/borrowing.
--   **Trust Marketplace:** Allow backers to offer vouching services for a fee/reward percentage.
--   **Integration with More Reputation Sources:** Gitcoin Passport, Lens Protocol, on-chain activity.
--   **Advanced SBT Functionality:** SBTs could unlock specific platform features or DAO voting rights.
+---
 
+## 🌐 Job Portal Integration
+
+- Employers can **verify a developer’s reputation** from the RepuFi protocol
+- A Chrome extension fetches GitHub ID + Wallet Address from the site:
+  - If a valid SBT exists, it is displayed as proof of verified backing
+  - If none exists or the SBT has expired, the candidate appears unvouched
+
+🔗 [Try It Out](https://jobportal-eosin-eta.vercel.app)
+
+---
+
+## 🔮 Future Roadmap
+
+- ✅ Third-party Challenge Feature *(Done)*
+- 🔁 Trust Marketplace (Paid Vouching)
+- 🏅 Reputation Streaks & Leaderboard
+- 🔗 Multi-platform ID Integration (Gitcoin, Lens)
+- 🧾 DAO-based reputation voting via SBTs
+- 🔓 Unlockable Access via SBTs (e.g., grants, forums)
+
+---
 
 ## 📢 Contributors
 
@@ -130,4 +162,9 @@ The borrower now holds this **VouchNFT** as a verifiable badge of trust.
   </tr>
 </table>
 
+---
 
+## 💬 Have Feedback?
+
+Open an issue or reach out to any of the contributors on GitHub.  
+We’d love to hear how RepuFi can support your Web3 journey 🚀
