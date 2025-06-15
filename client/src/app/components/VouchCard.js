@@ -1,93 +1,101 @@
-// components/VouchCard.js
-"use client";
+// app/(components)/VouchCard.jsx
+'use client';
 
-import { motion } from "framer-motion";
-import clsx from "clsx";
-import { Check, ExternalLink } from "lucide-react"; // npm install lucide-react
+import { motion } from 'framer-motion';
+import { ExternalLink, UserCircle, Users, CheckCircle, ShieldAlert, Clock, Loader2, GitBranch, ArrowRight } from 'lucide-react';
+import { Button } from './ui/Button'; // Assuming you have a Button component
 
-// A small component for the status badge
-const StatusBadge = ({ status }) => {
-  const isActive = status === 'ACTIVE';
-  return (
-    <div
-      className={clsx(
-        "flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium",
-        isActive
-          ? "bg-green-500/10 text-green-400"
-          : "bg-gray-400/10 text-gray-400"
-      )}
-    >
-      <span
-        className={clsx(
-          "h-1.5 w-1.5 rounded-full",
-          isActive ? "bg-green-500" : "bg-gray-500"
-        )}
-      />
-      {status}
-    </div>
-  );
-};
-
-
-// The main VouchCard component
-const VouchCard = ({ vouch }) => {
-  // Truncate wallet addresses for display
-  const truncateAddress = (address) => `${address.slice(0, 6)}...${address.slice(-4)}`;
-
-  return (
-    <motion.div
-      whileHover={{ y: -6, transition: { duration: 0.2 } }}
-      className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-1 backdrop-blur-lg"
-    >
-      {/* --- Hover Glow Effect --- */}
-      <div className="absolute inset-0 z-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(400px_at_50%_50%,rgba(0,255,255,0.1),transparent)]" />
-      
-      <div className="relative z-10 flex h-full flex-col p-4">
-        {/* --- Card Header Image --- */}
-        <div className="relative mb-4 overflow-hidden rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 p-8">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.1)_0%,transparent_50%)]" />
-            <Check className="mx-auto h-12 w-12 text-white" strokeWidth={1.5} />
+// This is a sub-component for displaying metadata neatly
+const InfoRow = ({ icon, label, value, isAddress = false, isCID = false }) => (
+    <div className="flex items-start justify-between text-sm py-2 border-b border-white/5">
+        <div className="flex items-center text-slate-400">
+            {icon}
+            <span className="ml-2">{label}</span>
         </div>
-
-        {/* --- Card Title & Status --- */}
-        <div className="flex items-center justify-between">
-          <h3 className="text-xl font-bold text-white">{vouch.title}</h3>
-          <StatusBadge status={vouch.status} />
-        </div>
-        <p className="mt-2 text-sm text-gray-400">{vouch.description}</p>
-        
-        <hr className="my-4 border-white/10" />
-
-        {/* --- Details Section --- */}
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-400">Backer:</span>
-            <span className="font-mono text-gray-300">{truncateAddress(vouch.backer)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Borrower:</span>
-            <span className="font-mono text-gray-300">{truncateAddress(vouch.borrower)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Stake:</span>
-            <span className="font-bold text-white">{vouch.stake}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Expires:</span>
-            <span className="text-gray-300">{vouch.expires}</span>
-          </div>
-        </div>
-        
-        {/* --- Footer Link --- */}
-        <div className="mt-auto pt-4">
-            <a href={vouch.metadataUrl} target="_blank" rel="noopener noreferrer" className="group/link flex items-center gap-2 text-sm text-cyan-400 transition-colors hover:text-cyan-300">
-                View Full Metadata
-                <ExternalLink className="h-4 w-4 transition-transform duration-200 group-hover/link:translate-x-0.5" />
+        {isAddress ? (
+            <a href={`https://testnet.avascan.info/blockchain/c/address/${value}`} target="_blank" rel="noopener noreferrer" className="font-mono text-cyan-400 hover:text-cyan-300 truncate transition-colors">
+                {`${value.substring(0, 6)}...${value.substring(value.length - 4)}`}
             </a>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
+        ) : isCID ? (
+             <a href={`https://ipfs.io/ipfs/${value}`} target="_blank" rel="noopener noreferrer" className="font-mono text-purple-400 hover:text-purple-300 truncate transition-colors">
+                {`${value.substring(0, 6)}...`} <ExternalLink size={12} className="inline-block ml-1" />
+            </a>
+        ) : (
+            <span className="font-medium text-white text-right">{value}</span>
+        )}
+    </div>
+);
 
-export default VouchCard;
+export function VouchCard({ vouch, isAdmin, handleAction, isActionPending, isActionConfirming, actionTokenId }) {
+    const isThisCardInAction = (isActionPending || isActionConfirming) && actionTokenId === vouch.id;
+
+    // Determine the role and status for the card's header
+    const getRoleAndStatus = () => {
+        if (vouch.isMyVouchAsBacker) return { role: 'You are the Backer', icon: <UserCircle className="text-cyan-400" size={24} /> };
+        if (vouch.isMyVouchAsBorrower) return { role: 'You are the Borrower', icon: <Users className="text-purple-400" size={24} /> };
+        return { role: 'Vouch', icon: <UserCircle size={24} /> };
+    };
+    const { role, icon } = getRoleAndStatus();
+
+    return (
+        // ==================================================================
+        // === THIS IS THE KEY CHANGE FOR THE FROSTED GLASS EFFECT ===
+        // ==================================================================
+        <motion.div
+            layout
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+            className="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-lg transition-all duration-300 hover:border-white/20"
+        >
+            {/* --- Card Header --- */}
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+                <div className="flex items-center gap-3">
+                    {icon}
+                    <span className="font-bold text-lg text-white">{role}</span>
+                </div>
+                <div className="text-xs font-mono px-2 py-1 rounded bg-black/20 text-slate-400">
+                    ID: {vouch.id}
+                </div>
+            </div>
+
+            {/* --- Card Body with Vouch Details --- */}
+            <div className="flex-grow space-y-1 mb-6">
+                <InfoRow icon={<GitBranch size={16} />} label="Reason" value={vouch.metadata?.description || 'N/A'} />
+                <InfoRow icon={<UserCircle size={16} />} label="Backer" value={vouch.backer} isAddress={true} />
+                <InfoRow icon={<Users size={16} />} label="Borrower" value={vouch.borrower} isAddress={true} />
+                <InfoRow icon={<Clock size={16} />} label="Expires" value={vouch.expiryDate} />
+                <InfoRow icon={<img src="/pas.png" className="w-4 h-4" />} label="Amount Staked" value={`${vouch.amount} PAS`} />
+                {vouch.metadataCID && <InfoRow icon={<ExternalLink size={16} />} label="Metadata" value={vouch.metadataCID} isCID={true} />}
+            </div>
+
+            {/* --- Card Footer with Status and Actions --- */}
+            <div className="mt-auto pt-4">
+                {/* Status Badge */}
+                <div className={`flex items-center justify-center p-2 rounded-md text-sm font-semibold mb-4 ${
+                    vouch.isExpired ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'
+                }`}>
+                    {vouch.isExpired ? <ShieldAlert size={16} className="mr-2" /> : <CheckCircle size={16} className="mr-2" />}
+                    Status: {vouch.withdrawn ? 'Withdrawn' : vouch.isExpired ? 'Expired' : 'Active'}
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {vouch.isMyVouchAsBacker && !vouch.isExpired && (
+                        <Button onClick={() => handleAction('expireVouch', vouch.id)} disabled={isThisCardInAction} className="btn-vouch-action !bg-yellow-600/80 hover:!bg-yellow-600">
+                            {isThisCardInAction ? <Loader2 className="animate-spin" /> : 'Expire Early'}
+                        </Button>
+                    )}
+                    {vouch.isMyVouchAsBacker && vouch.isExpired && !vouch.withdrawn && (
+                        <Button onClick={() => handleAction('releaseStake', vouch.id)} disabled={isThisCardInAction} className="btn-vouch-action !bg-green-600/80 hover:!bg-green-600">
+                            {isThisCardInAction ? <Loader2 className="animate-spin" /> : 'Release Stake'}
+                        </Button>
+                    )}
+                    {isAdmin && !vouch.isExpired && (
+                         <Button onClick={() => handleAction('slashStake', vouch.id)} disabled={isThisCardInAction} className="btn-vouch-action !bg-red-600/80 hover:!bg-red-600">
+                            {isThisCardInAction ? <Loader2 className="animate-spin" /> : 'Slash Stake (Admin)'}
+                        </Button>
+                    )}
+                </div>
+            </div>
+        </motion.div>
+    );
+}
