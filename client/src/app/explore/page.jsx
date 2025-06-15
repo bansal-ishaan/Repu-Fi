@@ -10,14 +10,14 @@ import {
     CHALLENGE_STAKE_ETH_STRING,
     displayChallengeStake
 } from '../../../lib/constants'; // Adjust path
-import { fetchFromIPFS } from '../../../lib/ipfsHelper'; // Adjust path
+import { fetchFromIPFS, uploadJsonToIPFS } from '../../../lib/ipfsHelper'; // Adjust path
 import { Button } from '../components/ui/Button';   // Adjust path
 import { Input } from '../components/ui/Input';     // Adjust path
 import { Textarea } from '../components/ui/Textarea'; // Adjust path
-import { Loader2, ShieldQuestion, LockKeyhole, AlertTriangle, CheckCircle, Eye, Users, Tag, CalendarDays, MessageSquare, Info, ExternalLink, Image as ImageIcon } from 'lucide-react'; // Added ImageIcon
+import { Loader2, ExternalLink , ShieldQuestion, LockKeyhole, AlertTriangle, CheckCircle, Eye, Users, Tag, CalendarDays, MessageSquare, Info } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
-// Minimal Modal (same as before)
+// Minimal Modal (can be shared or defined locally)
 const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
     return (
@@ -33,9 +33,6 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     );
 };
 
-// getDefaultSbtSvgImageClientSide (not strictly needed here if image is in metadata, but good to have for consistency if creating metadata elsewhere)
-// const getDefaultSbtSvgImageClientSide = () => { /* ... */ };
-
 
 export default function ExploreVouchesPage() {
   const { address: connectedAddress, isConnected } = useAccount();
@@ -45,8 +42,9 @@ export default function ExploreVouchesPage() {
   const [isLoadingVouches, setIsLoadingVouches] = useState(false);
   const [errorVouches, setErrorVouches] = useState(null);
 
+  // For Challenge Modal
   const [challengeModalOpen, setChallengeModalOpen] = useState(false);
-  const [vouchToChallenge, setVouchToChallenge] = useState(null);
+  const [vouchToChallenge, setVouchToChallenge] = useState(null); // Stores { id: tokenId, borrower: address, backer: address }
   const [challengeReason, setChallengeReason] = useState('');
 
   const {
@@ -56,11 +54,13 @@ export default function ExploreVouchesPage() {
     isPending: isChallengePending,
     error: challengeWriteError
   } = useWriteContract();
+
   const {
     isLoading: isChallengeConfirming,
     isSuccess: isChallengeConfirmed,
     error: challengeReceiptError
   } = useWaitForTransactionReceipt({ hash: challengeHash });
+
   const [challengeFormMessage, setChallengeFormMessage] = useState(null);
   const [challengeFormError, setChallengeFormError] = useState(null);
 
@@ -70,7 +70,7 @@ export default function ExploreVouchesPage() {
   const { data: vouchTokenIdCounterData, refetch: refetchVouchTokenIdCounter } = useReadContract({
     address: REPUFI_SBT_CONTRACT_ADDRESS,
     abi: REPUFI_SBT_ABI,
-    functionName: 'tokenIdCounter',
+    functionName: 'tokenIdCounter', // This counter is for SBTs (backer and borrower pairs)
     query: { enabled: isConnected }
   });
 
@@ -79,43 +79,58 @@ export default function ExploreVouchesPage() {
         setAllVouches([]); return;
     }
     setIsLoadingVouches(true); setErrorVouches(null);
-    const totalSBTs = Number(vouchTokenIdCounterData);
+    const totalSBTs = Number(vouchTokenIdCounterData); // Total SBTs minted
     if (totalSBTs === 0) {
         setAllVouches([]); setIsLoadingVouches(false); return;
     }
 
     const fetchedVouches = [];
-    const processedVouchInstances = new Set();
+    // Iterate through potential Vouch SBT IDs.
+    // Since each vouch creates two SBTs (backer & borrower), we need to be careful.
+    // We are interested in the Vouch struct, which is keyed by these SBT IDs.
+    // We only need to show one entry per "vouch instance".
+    const processedVouchInstances = new Set(); // To avoid duplicates if we iterate all tokenIds
 
     try {
+        // Iterate backwards from the latest tokenIdCounter
+        // We're interested in unique vouches. The `vouches` mapping uses tokenId as key.
+        // One conceptual "vouch" results in two Vouch structs with pairedTokenId.
+        // We only need to display one side of the pair for the "Explore" view.
         for (let i = totalSBTs; i >= 1; i--) {
-            if (fetchedVouches.length >= 30 && i < totalSBTs - 60) break;
-            if (processedVouchInstances.has(i)) continue;
+            if (fetchedVouches.length >= 30 && i < totalSBTs - 60) break; // Optimization
+             if (processedVouchInstances.has(i)) continue; // Skip if already processed its pair
 
             try {
                 const rawVouchArray = await publicClient.readContract({
                     address: REPUFI_SBT_CONTRACT_ADDRESS, abi: REPUFI_SBT_ABI,
-                    functionName: 'vouches', args: [BigInt(i)]
+                    functionName: 'vouches', args: [BigInt(i)] // `vouches` is the mapping name
                 });
 
-                if (!rawVouchArray || rawVouchArray.length < 8) { continue; }
-                const [ backer, borrower, amount, expiry, withdrawn, pairedTokenIdBigInt, forceExpired, metadataCID ] = rawVouchArray;
-                const pairedTokenId = Number(pairedTokenIdBigInt);
+                if (!rawVouchArray || rawVouchArray.length < 8) { // Vouch struct has 8 fields
+                    console.warn(`Skipping Vouch ID ${i}: Invalid data structure.`);
+                    continue;
+                }
 
+                const [ backer, borrower, amount, expiry, withdrawn, pairedTokenId, forceExpired, metadataCID ] = rawVouchArray;
 
                 if (backer && backer !== "0x0000000000000000000000000000000000000000" && !withdrawn && !forceExpired) {
-                    let ipfsMetadata = { name: `Vouch (SBT ID: ${i})`, description: "Metadata loading...", image: null };
+                    let ipfsMetadata = { name: `Vouch (SBT ID: ${i})`, description: "Metadata loading..." };
                     if (metadataCID && typeof metadataCID === 'string' && metadataCID.trim() !== '') {
                         try { ipfsMetadata = await fetchFromIPFS(metadataCID); }
                         catch (e) { console.warn(`IPFS error for Vouch CID ${metadataCID} (SBT ID ${i}):`, e); }
                     }
 
                     fetchedVouches.push({
-                        sbtId: i, backer, borrower, amount, expiry: Number(expiry), metadataCID,
-                        pairedTokenId, metadata: ipfsMetadata
+                        sbtId: i, // The ID of this specific SBT (could be backer's or borrower's view of the vouch)
+                        backer, borrower, amount, expiry: Number(expiry), metadataCID,
+                        pairedTokenId: Number(pairedTokenId),
+                        metadata: ipfsMetadata
                     });
+                    // Add both this ID and its pair to processed set to avoid showing the same vouch twice
                     processedVouchInstances.add(i);
-                    if (pairedTokenId > 0) processedVouchInstances.add(pairedTokenId);
+                    if (pairedTokenId && Number(pairedTokenId) > 0) {
+                        processedVouchInstances.add(Number(pairedTokenId));
+                    }
                 }
             } catch (e) { console.warn(`Could not fetch Vouch ID ${i}:`, e.message); }
         }
@@ -130,21 +145,65 @@ export default function ExploreVouchesPage() {
     }
   }, [isConnected, vouchTokenIdCounterData, fetchAllActiveVouches]);
 
-  const handleOpenChallengeModal = (vouchSbtId, borrowerAddress, backerAddress) => { /* ... same ... */ };
-  const handleChallengeSubmit = async (e) => { /* ... same ... */ };
-  useEffect(() => { /* ... challenge confirmation useEffect ... */ }, [isChallengeConfirmed, challengeWriteError, challengeReceiptError /*, fetchAllActiveVouches (if needed) */]);
+  const handleOpenChallengeModal = (vouchSbtId, borrowerAddress, backerAddress) => {
+    setVouchToChallenge({ id: vouchSbtId, borrower: borrowerAddress, backer: backerAddress });
+    setChallengeReason('');
+    setChallengeFormError(null); setChallengeFormMessage(null);
+    resetChallengeContract();
+    setChallengeModalOpen(true);
+  };
+  
+
+  const handleChallengeSubmit = async (e) => {
+    e.preventDefault();
+    setChallengeFormError(null); setChallengeFormMessage(null); resetChallengeContract();
+
+    if (!vouchToChallenge || !vouchToChallenge.id) {
+        setChallengeFormError("No vouch selected for challenge."); return;
+    }
+    if (!challengeReason.trim()) {
+        setChallengeFormError('A reason for the challenge is required.'); return;
+    }
+
+    setChallengeFormMessage(`Preparing challenge for Vouch SBT #${vouchToChallenge.id}...`);
+    try {
+      setChallengeFormMessage(`Submitting challenge transaction (Stake: ${displayStakeString})...`);
+      console.log("Calling createChallenge with args:", {
+          vouchTokenId: BigInt(vouchToChallenge.id),
+          challengeReason,
+          value: challengeStakeInWei.toString()
+      });
+      executeCreateChallenge({
+        address: REPUFI_SBT_CONTRACT_ADDRESS, abi: REPUFI_SBT_ABI,
+        functionName: 'createChallenge',
+        args: [BigInt(vouchToChallenge.id), challengeReason],
+        value: challengeStakeInWei,
+      });
+    } catch (err) {
+      console.error('Challenge creation error:', err);
+      setChallengeFormError(`Error: ${err.message || 'An error occurred.'}`);
+      setChallengeFormMessage(null);
+    }
+  };
+
+  useEffect(() => {
+    if (isChallengeConfirmed) {
+      setChallengeFormMessage('Challenge submitted successfully! Transaction confirmed.');
+      setChallengeFormError(null);
+      // Optionally refetch vouches if a challenge might change their display status (not directly, but good practice)
+      // fetchAllActiveVouches();
+      setTimeout(() => {
+        setChallengeModalOpen(false);
+        setChallengeFormMessage(null);
+        setVouchToChallenge(null);
+      }, 3500);
+    }
+    if (challengeWriteError) { setChallengeFormError(`Tx Error: ${challengeWriteError.shortMessage || challengeWriteError.message}`); setChallengeFormMessage(null); }
+    if (challengeReceiptError) { setChallengeFormError(`Confirm Error: ${challengeReceiptError.shortMessage || challengeReceiptError.message}`); setChallengeFormMessage(null); }
+  }, [isChallengeConfirmed, challengeWriteError, challengeReceiptError /*, fetchAllActiveVouches */]);
 
 
-  if (!isConnected) {
-    return (
-      <div className="card p-8 text-center max-w-md mx-auto my-10 animate-fadeIn">
-        <LockKeyhole className="h-16 w-16 mx-auto text-primary opacity-70 mb-6" />
-        <h2 className="text-2xl font-semibold text-foreground mb-3">Connect Wallet</h2>
-        <p className="text-slate-600 dark:text-slate-400 mb-6">Connect your wallet to explore vouches.</p>
-        <div className="flex justify-center"><ConnectButton /></div>
-      </div>
-    );
-  }
+  if (!isConnected) { /* ... Connect Wallet Prompt ... */ }
 
   return (
     <div className="space-y-10 pb-12">
@@ -167,52 +226,39 @@ export default function ExploreVouchesPage() {
         <div className="card p-8 text-center">
             <Eye size={48} className="mx-auto mb-4 opacity-50 text-slate-400 dark:text-slate-500"/>
             <h3 className="text-xl font-medium mb-2">No Active Vouches Found</h3>
-            <p className="text-slate-500 dark:text-slate-400">There are currently no active vouches to display.</p>
+            <p className="text-slate-500 dark:text-slate-400">There are currently no active vouches to display, or none could be fetched.</p>
         </div>
       )}
 
       {allVouches.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {allVouches.map(vouch => {
                 const displayExpiry = vouch.expiry && !isNaN(Number(vouch.expiry)) ? new Date(Number(vouch.expiry) * 1000).toLocaleString() : "N/A";
                 const displayAmount = typeof vouch.amount === 'bigint' ? formatEther(vouch.amount) : "N/A";
+                // Check if current user is the backer or borrower of this specific vouch
                 const isMyVouch = connectedAddress &&
                                  (vouch.backer?.toLowerCase() === connectedAddress.toLowerCase() ||
                                   vouch.borrower?.toLowerCase() === connectedAddress.toLowerCase());
 
                 return (
-                    <div key={vouch.sbtId} className="card p-5 space-y-3 flex flex-col justify-between hover:shadow-xl transition-shadow duration-300 ease-in-out">
+                    <div key={vouch.sbtId} className="card p-5 space-y-3 flex flex-col justify-between hover:shadow-xl transition-shadow">
                         <div>
-                            {/* Image Display Section */}
-                            {vouch.metadata?.image ? (
-                                <img
-                                    src={vouch.metadata.image}
-                                    alt={vouch.metadata?.name || `Vouch SBT ${vouch.sbtId}`}
-                                    className="w-full h-40 object-contain rounded-md mb-3 bg-slate-100 dark:bg-slate-800 p-2 border border-border"
-                                    onError={(e) => { e.target.style.display = 'none'; /* Hide if image fails to load */ }}
-                                />
-                            ) : (
-                                <div className="w-full h-40 rounded-md mb-3 bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-border">
-                                    <ImageIcon className="w-16 h-16 text-slate-300 dark:text-slate-600" />
-                                </div>
-                            )}
-
                             <h3 className="font-semibold text-lg text-primary truncate" title={vouch.metadata?.name || `Vouch (SBT ID: ${vouch.sbtId})`}>
                                 {vouch.metadata?.name || `Vouch (SBT ID: ${vouch.sbtId})`}
                             </h3>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">SBT ID: {vouch.sbtId}</p>
 
                             <div className="text-xs space-y-1 text-slate-600 dark:text-slate-300">
-                                <p><strong>Backer:</strong> <span className="font-mono block truncate" title={vouch.backer}>{vouch.backer}</span></p>
-                                <p><strong>Borrower:</strong> <span className="font-mono block truncate" title={vouch.borrower}>{vouch.borrower}</span></p>
+                                <p><strong>Backer:</strong> <span className="font-mono block truncate">{vouch.backer}</span></p>
+                                <p><strong>Borrower:</strong> <span className="font-mono block truncate">{vouch.borrower}</span></p>
                                 <p><strong>Staked:</strong> {displayAmount} PAS</p>
                                 <p><strong>Expires:</strong> {displayExpiry}</p>
                             </div>
-                            {vouch.metadata?.description && <p className="text-sm mt-2 text-foreground break-words max-h-20 overflow-y-auto">{vouch.metadata.description}</p>}
+                            {vouch.metadata?.description && <p className="text-sm mt-2 text-foreground break-words">{vouch.metadata.description.substring(0,100)}{vouch.metadata.description.length > 100 ? "..." : ""}</p>}
                             {vouch.metadataCID && <a href={`https://gateway.pinata.cloud/ipfs/${vouch.metadataCID}`} target="_blank" rel="noopener noreferrer" className="mt-1 text-xs text-primary hover:underline flex items-center">View Full Metadata <ExternalLink size={12} className="ml-1"/></a>}
                         </div>
-                        <div className="mt-auto pt-4">
-                            {!isMyVouch && isConnected && (
+                        <div className="mt-auto pt-3">
+                            {!isMyVouch && isConnected && ( // Don't allow challenging your own vouches
                                 <Button
                                     onClick={() => handleOpenChallengeModal(vouch.sbtId, vouch.borrower, vouch.backer)}
                                     className="w-full btn-danger bg-orange-500 hover:bg-orange-600 text-xs !py-2"
@@ -220,7 +266,7 @@ export default function ExploreVouchesPage() {
                                     <ShieldQuestion size={14} className="mr-1.5"/> Challenge this Vouch
                                 </Button>
                             )}
-                             {isMyVouch && <p className="text-xs text-center text-slate-400 dark:text-slate-500 italic mt-2">This is one of your vouches.</p>}
+                             {isMyVouch && <p className="text-xs text-center text-slate-400 dark:text-slate-500 italic">This is your vouch.</p>}
                         </div>
                     </div>
                 );
@@ -260,7 +306,6 @@ export default function ExploreVouchesPage() {
               </form>
           )}
       </Modal>
-
 
     </div>
   );
