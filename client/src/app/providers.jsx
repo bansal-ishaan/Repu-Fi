@@ -9,7 +9,7 @@
   import { SessionProvider } from 'next-auth/react'; // <-- IMPORT THIS
   import { passetHubTestnet } from '../../lib/constants';
   import { sepolia } from 'wagmi/chains';
-
+  import { GitHubScoreProvider } from './context/GitHubScoreContext'; // Adjust path if context is elsewhere
   const { wallets } = getDefaultWallets();
   const queryClient = new QueryClient();
 
@@ -39,12 +39,14 @@
         <QueryClientProvider client={queryClient}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <SessionProvider> {/* <-- WRAP WITH THIS */}
+              <GitHubScoreProvider>
               <RainbowKitProvider
                 theme={resolvedTheme === 'dark' ? darkTheme() : lightTheme()}
                 modalSize="compact"
               >
                 {children}
               </RainbowKitProvider>
+              </GitHubScoreProvider>
             </SessionProvider> {/* <-- WRAP WITH THIS */}
           </ThemeProvider>
         </QueryClientProvider>

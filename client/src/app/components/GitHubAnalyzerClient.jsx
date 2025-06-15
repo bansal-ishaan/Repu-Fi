@@ -1,148 +1,174 @@
-// src/app/components/GitHubAnalyzerClient.jsx
+// app/(components)/GitHubAnalyzerClient.jsx
 'use client';
-import { useState, useEffect } from 'react';
-import { useSession, signIn } from 'next-auth/react';
+import { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import { Button } from './ui/Button';
-import { Loader2, Github, Star, GitCommit, GitPullRequest, AlertCircle, Briefcase, CheckCircle2, XCircle, LogIn } from 'lucide-react';
+import { Input } from './ui/Input';
+import { Loader2, Github, /* ... other icons ... */ RefreshCw } from 'lucide-react';
+import { storeGitHubData, getGitHubData, clearGitHubData } from '../../../lib/localStorageHelper';
+import { useAccount } from 'wagmi';
+import { useSession } from 'next-auth/react'; // <--- IMPORT useSession
+import Link from 'next/link';
+const MIN_GITHUB_SCORE_CONTRACT = 7;
 
-// (Helper components getLetterGrade and CircularGradeDisplay can remain the same as you had)
-const getLetterGrade = (score) => {
-  if (score >= 9.5) return { grade: "A+", color: "text-green-500 dark:text-green-400", ringColorCss: "stroke-green-500", label: "Exceptional" };
-  if (score >= 9.0) return { grade: "A", color: "text-green-500 dark:text-green-400", ringColorCss: "stroke-green-500", label: "Excellent" };
-  if (score >= 8.5) return { grade: "A-", color: "text-green-500 dark:text-green-400", ringColorCss: "stroke-green-500", label: "Very Strong" };
-  if (score >= 8.0) return { grade: "B+", color: "text-sky-500 dark:text-sky-400", ringColorCss: "stroke-sky-500", label: "Strong" };
-  if (score >= 7.0) return { grade: "B", color: "text-sky-500 dark:text-sky-400", ringColorCss: "stroke-sky-500", label: "Good" };
-  if (score >= 6.0) return { grade: "B-", color: "text-yellow-500 dark:text-yellow-400", ringColorCss: "stroke-yellow-500", label: "Above Average" };
-  if (score >= 5.5) return { grade: "C+", color: "text-orange-500 dark:text-orange-400", ringColorCss: "stroke-orange-500", label: "Average" };
-  if (score >= 5.0) return { grade: "C", color: "text-orange-500 dark:text-orange-400", ringColorCss: "stroke-orange-500", label: "Fair" };
-  return { grade: "C-", color: "text-red-500 dark:text-red-400", ringColorCss: "stroke-red-500", label: "Needs Improvement" };
-};
-
-const CircularGradeDisplay = ({ score, size = 120, strokeWidth = 10 }) => {
-  const { grade, ringColorCss } = getLetterGrade(score);
-  const normalizedScoreForRing = Math.max(0, Math.min(100, ((score - 5) / 5) * 100));
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (normalizedScoreForRing / 100) * circumference;
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90 transform">
-        <circle className="text-slate-200 dark:text-slate-700" strokeWidth={strokeWidth} stroke="currentColor" fill="transparent" r={radius} cx={size / 2} cy={size / 2} />
-        <circle className={`${ringColorCss} transition-all duration-1000 ease-out`} strokeWidth={strokeWidth} strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" stroke="currentColor" fill="transparent" r={radius} cx={size / 2} cy={size / 2} />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-4xl font-bold ${getLetterGrade(score).color}`}>{grade}</span>
-      </div>
-    </div>
-  );
-};
-
-const StatItem = ({ icon, label, value }) => (
-  <div className="flex items-center space-x-3 py-2">
-    <div className="text-primary">{icon}</div>
-    <div className="flex-1"><p className="text-sm text-slate-600 dark:text-slate-300">{label}:</p></div>
-    <p className="text-lg font-semibold text-foreground">{value}</p>
+// ProgressBar component (same 
+const ProgressBar = ({ value, className = "" }) => (
+  <div className={`w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 ${className}`}>
+    <div
+      className="bg-blue-500 h-2.5 rounded-full transition-all duration-500 ease-out"
+      style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+    ></div>
   </div>
 );
 
 export default function GitHubAnalyzerClient({ onAnalysisComplete }) {
-  const { data: session, status } = useSession();
+  const { address: connectedAddress } = useAccount();
+  const { data: session, status: sessionStatus } = useSession(); // <--- USE SESSION
+
+  const [usernameToAnalyze, setUsernameToAnalyze] = useState(""); // This can be pre-filled or input
   const [loading, setLoading] = useState(false);
   const [scoreData, setScoreData] = useState(null);
   const [error, setError] = useState("");
+  const [showForceRefresh, setShowForceRefresh] = useState(false);
+  const [isAutoAnalyzed, setIsAutoAnalyzed] = useState(false); // Flag to prevent re-auto-analyzing
 
-  const analyzeProfile = async (username) => {
-    if (!username) return;
-    setLoading(true); setError(""); setScoreData(null);
+  // Function to trigger analysis
+  const analyzeProfile = useCallback(async (ghUsername, forceRefresh = false) => {
+    if (!ghUsername || !ghUsername.trim()) {
+      setError("GitHub username is required to analyze.");
+      if (onAnalysisComplete) onAnalysisComplete(null);
+      return;
+    }
+
+    // Check local storage first if not forcing refresh
+    if (!forceRefresh && connectedAddress) {
+        const storedData = getGitHubData(connectedAddress);
+        if (storedData && storedData.username?.toLowerCase() === ghUsername.trim().toLowerCase()) {
+            setScoreData(storedData);
+            setUsernameToAnalyze(storedData.username); // Ensure input field matches
+            if (onAnalysisComplete) onAnalysisComplete(storedData);
+            setShowForceRefresh(true);
+            return; // Use cached data
+        }
+    }
+
+    setLoading(true);
+    setError("");
+    // Don't clear scoreData here if we want to show old score while new one loads
+    // setScoreData(null);
+
     try {
       const response = await fetch("/api/github-score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ username: ghUsername.trim() }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to analyze profile.");
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to analyze profile.");
+      }
       setScoreData(data);
-      if (onAnalysisComplete) onAnalysisComplete(data);
+      if (connectedAddress) {
+        storeGitHubData(connectedAddress, data);
+      }
+      if (onAnalysisComplete) {
+        onAnalysisComplete(data);
+      }
+      setShowForceRefresh(true);
     } catch (err) {
       setError(err.message);
-      if (onAnalysisComplete) onAnalysisComplete(null); // Clear data on error
+      setScoreData(null); // Clear score on error
+      if (onAnalysisComplete) onAnalysisComplete(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [connectedAddress, onAnalysisComplete]); // Add dependencies for useCallback
 
+  // Effect to auto-analyze when session is available or connectedAddress changes
   useEffect(() => {
-    if (status === 'authenticated' && session?.user?.githubUsername) {
-      analyzeProfile(session.user.githubUsername);
-    } else {
-      setScoreData(null); // Clear score data if user logs out
-      if (onAnalysisComplete) onAnalysisComplete(null);
+    if (sessionStatus === 'authenticated' && session?.user?.githubUsername && !isAutoAnalyzed) {
+      const ghUsernameFromSession = session.user.githubUsername;
+      setUsernameToAnalyze(ghUsernameFromSession); // Pre-fill input
+      analyzeProfile(ghUsernameFromSession); // Analyze automatically
+      setIsAutoAnalyzed(true); // Prevent re-analyzing on every render
+    } else if (sessionStatus !== 'loading' && !isAutoAnalyzed && connectedAddress) {
+      // If not authenticated via GitHub but wallet is connected, check localStorage
+      const storedData = getGitHubData(connectedAddress);
+      if (storedData && storedData.username) {
+        setUsernameToAnalyze(storedData.username);
+        setScoreData(storedData);
+        if (onAnalysisComplete) onAnalysisComplete(storedData);
+        setShowForceRefresh(true);
+        setIsAutoAnalyzed(true);
+      }
+    } else if (sessionStatus === 'unauthenticated') {
+      // If user logs out of GitHub, clear auto-analyzed state
+      // but keep localStorage data if wallet is still connected.
+      setIsAutoAnalyzed(false);
+      // Optionally clear usernameToAnalyze if you want the field to empty on GitHub logout
+      // setUsernameToAnalyze("");
     }
-  }, [session, status]); // Re-run when session changes
+  }, [sessionStatus, session, analyzeProfile, onAnalysisComplete, connectedAddress, isAutoAnalyzed]);
 
-  if (status === 'loading') {
-    return <div className="card p-6 text-center"> <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" /> <p className="mt-2">Loading Session...</p></div>;
+  const handleManualAnalyze = () => {
+     setIsAutoAnalyzed(true); // Treat manual analysis as if it was "auto" for the purpose of not re-triggering
+     analyzeProfile(usernameToAnalyze);
   }
 
-  if (status === 'unauthenticated') {
-    return (
-      <div className="card p-8 text-center">
-          <LogIn className="mx-auto h-10 w-10 text-primary mb-4"/>
-          <h2 className="text-2xl font-semibold mb-2">Login to Analyze Your Profile</h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
-              Please log in with your GitHub account to automatically analyze your developer reputation.
-          </p>
-          <Button onClick={() => signIn('github')} className="btn-primary">
-              <Github className="mr-2 h-5 w-5"/> Login with GitHub
-          </Button>
-      </div>
-    );
+  const handleClearAndRefresh = () => {
+     if (connectedAddress) {
+         clearGitHubData(connectedAddress);
+     }
+     setScoreData(null);
+     setShowForceRefresh(false);
+     if (onAnalysisComplete) onAnalysisComplete(null);
+     analyzeProfile(usernameToAnalyze, true); // Force a new analysis with current username
   }
+
+
+  const getScoreColorClass = (scoreVal) => { /* ... same as before ... */ };
+
+  // Don't render input if session is loading and we don't have a username yet
+  // if (sessionStatus === 'loading' && !usernameToAnalyze) {
+  //   return <div className="card p-6 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto" /> <p>Loading user session...</p></div>;
+  // }
 
   return (
-    <div className="card p-6 md:p-8 animate-fadeIn">
-      {loading && (
-          <div className="text-center">
-              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-              <p className="mt-2 font-semibold">Analyzing {session.user.githubUsername}'s Profile...</p>
-          </div>
+    <div className="card p-6 animate-fadeIn">
+      {/* ... Card Header ... */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-1">
+        <Input
+          type="text"
+          placeholder="Enter GitHub username or login"
+          value={usernameToAnalyze}
+          onChange={(e) => {
+             setUsernameToAnalyze(e.target.value);
+             setShowForceRefresh(false); // Hide refresh if username changes from analyzed one
+             setIsAutoAnalyzed(true); // User is now manually controlling
+          }}
+          onKeyPress={(e) => e.key === "Enter" && !loading && handleManualAnalyze()}
+          className="flex-grow"
+          aria-label="GitHub Username"
+          disabled={loading || (sessionStatus === 'authenticated' && !!session?.user?.githubUsername)} // Disable if logged in and username is from session
+        />
+        <Button onClick={handleManualAnalyze} disabled={loading || !usernameToAnalyze.trim()} className="w-full sm:w-auto btn-primary">
+          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Github className="mr-2 h-4 w-4" />}
+          {loading ? "Analyzing..." : (scoreData && scoreData.username?.toLowerCase() === usernameToAnalyze.trim().toLowerCase()) ? "Re-Analyze" : "Analyze Profile"}
+        </Button>
+      </div>
+      {showForceRefresh && scoreData && (
+         <div className="text-center mb-4">
+             <Button onClick={handleClearAndRefresh} variant="link" className="text-xs text-primary p-0 h-auto hover:underline" disabled={loading}>
+                 <RefreshCw size={12} className="mr-1"/> Force refresh score for '{scoreData.username}'
+             </Button>
+         </div>
       )}
+      {error && <p className="text-red-500 text-sm text-center mb-4 animate-fadeIn">{error}</p>}
 
-      {error && <p className="text-red-500 text-sm text-center mb-4 p-3 bg-red-50 dark:bg-red-900/30 rounded-md"><AlertCircle className="inline mr-1 h-4 w-4"/>{error}</p>}
-      
-      {!loading && scoreData && (
-        <div className="animate-fadeIn">
-           <div className="text-center mb-6">
-             {scoreData.details.avatarUrl && (
-              <img src={scoreData.details.avatarUrl} alt={scoreData.username} className="w-24 h-24 rounded-full mx-auto mb-3 border-4 border-slate-200 dark:border-slate-700 shadow-lg"/>
-             )}
-             <h3 className="text-2xl font-semibold text-foreground">
-              <a href={scoreData.details.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                {scoreData.details.name || scoreData.username}
-              </a>
-             </h3>
-             <p className={`text-sm font-medium ${getLetterGrade(scoreData.totalScore).color}`}>Overall Score: {scoreData.totalScore.toFixed(1)}/10 ({getLetterGrade(scoreData.totalScore).label})</p>
-             {scoreData.totalScore >= 7 ?
-              <p className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center justify-center gap-1"><CheckCircle2 size={14}/>Eligible to be a Backer</p> :
-              <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center justify-center gap-1"><XCircle size={14}/>Score too low to be a Backer (Min 7 required)</p>
-             }
-           </div>
-           <div className="max-w-2xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-1 items-center">
-             <div className="space-y-1 pr-4 md:border-r border-border dark:border-dark-border">
-              <h4 className="text-lg font-semibold text-foreground mb-3">Key Metrics:</h4>
-              <StatItem icon={<Star size={18} />} label="Total Stars Earned" value={scoreData.details.totalStars} />
-              <StatItem icon={<GitCommit size={18} />} label="Recent Commits (owned, 30d)" value={scoreData.details.recentCommits} />
-              <StatItem icon={<GitPullRequest size={18} />} label="Total PRs Created" value={scoreData.details.totalPRs} />
-              <StatItem icon={<AlertCircle size={18} />} label="Total Issues Created" value={scoreData.details.totalIssues} />
-              <StatItem icon={<Briefcase size={18} />} label="PRs to Other Repos" value={scoreData.details.contributedToPRs} />
-             </div>
-             <div className="flex flex-col items-center justify-center py-6 md:py-0">
-              <CircularGradeDisplay score={scoreData.totalScore} />
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">RepuFi Grade</p>
-             </div>
-           </div>
-        </div>
+      {/* ... Score Display logic (same as before, using scoreData) ... */}
+      {scoreData && (
+         <div className="animate-fadeIn space-y-6 mt-6">
+             {/* ... score display ... */}
+         </div>
       )}
     </div>
   );

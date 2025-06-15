@@ -1,7 +1,3 @@
-// src/app/api/github-score/logic.js
-
-// --- ALL THE LOGIC FROM YOUR ORIGINAL route.js GOES HERE ---
-
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
@@ -100,18 +96,19 @@ export function calculateScore(user, repos, recentCommits, totalPRs, totalIssues
     const profileCompleteness = (profileFields / 5) * 100;
 
     const scores = {
-        repositories: Math.min(10, 5 + (user.public_repos / 25) * 5),
-        followers: Math.min(10, 5 + Math.log10(Math.max(1, user.followers + 1)) * 1.5),
-        stars: Math.min(10, 5 + Math.log10(Math.max(1, totalStars + 1)) * 1.2),
-        forks: Math.min(10, 5 + Math.log10(Math.max(1, totalForks + 1)) * 1.0),
-        accountAge: Math.min(10, 5 + Math.min(5, accountAge * 1.25)),
-        activity: Math.min(10, 5 + (recentCommits / 25) * 5),
-        prs: Math.min(10, 5 + Math.log10(Math.max(1, totalPRs + 1)) * 1.5),
-        issues: Math.min(10, 5 + Math.log10(Math.max(1, totalIssues + 1)) * 1.0),
-        contributions: Math.min(10, 5 + Math.log10(Math.max(1, contributedToPRs + 1)) * 2.0),
-        profile: 5 + (profileCompleteness / 100) * 5,
-        languages: Math.min(10, 5 + (languageCount / 4) * 5),
+        repositories: Math.min(10, 5 + (user.public_repos / 25) * 50),
+        followers: Math.min(10, 5 + Math.log10(Math.max(1, user.followers + 1)) * 10.5),
+        stars: Math.min(10, 5 + Math.log10(Math.max(1, totalStars + 1)) * 10.2),
+        forks: Math.min(10, 5 + Math.log10(Math.max(1, totalForks + 1)) * 10.0),
+        accountAge: Math.min(10, 5 + Math.min(5, accountAge * 10.25)),
+        activity: Math.min(10, 5 + (recentCommits / 25) * 50),
+        prs: Math.min(10, 5 + Math.log10(Math.max(1, totalPRs + 1)) * 10.5),
+        issues: Math.min(10, 5 + Math.log10(Math.max(1, totalIssues + 1)) * 10.0),
+        contributions: Math.min(10, 5 + Math.log10(Math.max(1, contributedToPRs + 1)) * 20.0),
+        profile: 5 + (profileCompleteness / 100) * 50,
+        languages: Math.min(10, 5 + (languageCount / 4) * 50),
     };
+    
     for (const key in scores) { scores[key] = Math.max(5, parseFloat(scores[key].toFixed(1))); }
 
     const weights = {
