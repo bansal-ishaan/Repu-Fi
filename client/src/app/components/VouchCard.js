@@ -2,8 +2,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { ExternalLink, UserCircle, Users, CheckCircle, ShieldAlert, Clock, Loader2, GitBranch, ArrowRight } from 'lucide-react';
-import { Button } from './ui/Button'; // Assuming you have a Button component
+import { ExternalLink, UserCircle, Users, CheckCircle, ShieldAlert, Clock, Loader2, GitBranch } from 'lucide-react';
+import { FiDollarSign } from "react-icons/fi"; // Using react-icons for the dollar sign
+import { Button } from './ui/Button';
 
 // This is a sub-component for displaying metadata neatly
 const InfoRow = ({ icon, label, value, isAddress = false, isCID = false }) => (
@@ -38,9 +39,6 @@ export function VouchCard({ vouch, isAdmin, handleAction, isActionPending, isAct
     const { role, icon } = getRoleAndStatus();
 
     return (
-        // ==================================================================
-        // === THIS IS THE KEY CHANGE FOR THE FROSTED GLASS EFFECT ===
-        // ==================================================================
         <motion.div
             layout
             variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
@@ -59,11 +57,12 @@ export function VouchCard({ vouch, isAdmin, handleAction, isActionPending, isAct
 
             {/* --- Card Body with Vouch Details --- */}
             <div className="flex-grow space-y-1 mb-6">
-                <InfoRow icon={<GitBranch size={16} />} label="Reason" value={vouch.metadata?.description || 'N/A'} />
+                <InfoRow icon={<GitBranch size={16} />} label="Reason" value={vouch.reason || 'N/A'} />
                 <InfoRow icon={<UserCircle size={16} />} label="Backer" value={vouch.backer} isAddress={true} />
                 <InfoRow icon={<Users size={16} />} label="Borrower" value={vouch.borrower} isAddress={true} />
                 <InfoRow icon={<Clock size={16} />} label="Expires" value={vouch.expiryDate} />
-                <InfoRow icon={<img src="/pas.png" className="w-4 h-4" />} label="Amount Staked" value={`${vouch.amount} PAS`} />
+                {/* === ICON UPDATED HERE === */}
+                <InfoRow icon={<FiDollarSign size={16} />} label="Amount Staked" value={`${vouch.amount} PAS`} />
                 {vouch.metadataCID && <InfoRow icon={<ExternalLink size={16} />} label="Metadata" value={vouch.metadataCID} isCID={true} />}
             </div>
 
@@ -89,11 +88,11 @@ export function VouchCard({ vouch, isAdmin, handleAction, isActionPending, isAct
                             {isThisCardInAction ? <Loader2 className="animate-spin" /> : 'Release Stake'}
                         </Button>
                     )}
-                    {isAdmin && !vouch.isExpired && (
+                    {/* {isAdmin && !vouch.isExpired && (
                          <Button onClick={() => handleAction('slashStake', vouch.id)} disabled={isThisCardInAction} className="btn-vouch-action !bg-red-600/80 hover:!bg-red-600">
                             {isThisCardInAction ? <Loader2 className="animate-spin" /> : 'Slash Stake (Admin)'}
                         </Button>
-                    )}
+                    )} */}
                 </div>
             </div>
         </motion.div>
