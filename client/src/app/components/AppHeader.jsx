@@ -59,7 +59,6 @@ export default function AppHeader() {
     { href: "/become-backer", label: "Become Backer", icon: Users },
     { href: "/request-reputation", label: "Request Vouch", icon: UserPlus },
     { href: "/my-vouches", label: "My Vouches", icon: Info },
-    { href: "/challenge-vouch", label: "Challenge", icon: ShieldQuestion },
     ...(isAdmin ? [{ href: "/admin/challenges", label: "Admin", icon: UserCog, className: "text-orange-500 hover:text-orange-600 dark:hover:text-orange-400" }] : []),
   ];
 
