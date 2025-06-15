@@ -4,16 +4,18 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from 'wagmi';
 import { parseEther, formatEther, isAddress } from 'viem';
+import { useSession, signIn } from 'next-auth/react';
 import {
     REPUFI_SBT_CONTRACT_ADDRESS,
     REPUFI_SBT_ABI,
     MIN_GITHUB_SCORE_CONTRACT
-} from '../../../lib/constants'; // Adjust: from app/become-backer/ -> root/lib/
-import { uploadJsonToIPFS, fetchFromIPFS } from '../../../lib/ipfsHelper'; // Adjust
-import { Button } from '../components/ui/Button';   // Adjust: from app/become-backer/ -> app/component/ui/
-import { Input } from '../components/ui/Input';     // Adjust
-import { Textarea } from '../components/ui/Textarea'; // Adjust
-import { Loader2, ShieldAlert, LockKeyhole, CheckCircle2, UserPlus, FileText, Clock, ExternalLink, Eye, Users } from 'lucide-react';
+} from '../../../lib/constants'; // Adjust path
+import { uploadJsonToIPFS, fetchFromIPFS } from '../../../lib/ipfsHelper'; // Adjust path
+import { useGitHubScore } from '../context/GitHubScoreContext'; // Adjust path
+import { Button } from '../components/ui/Button';   // Adjust path
+import { Input } from '../components/ui/Input';     // Adjust path
+import { Textarea } from '../components/ui/Textarea'; // Adjust path
+import { Loader2, ShieldAlert, LockKeyhole, CheckCircle2, UserPlus, FileText, Clock, ExternalLink, Eye, Users, Github, Info } from 'lucide-react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 
@@ -42,15 +44,13 @@ const getDefaultSbtSvgImageClientSide = () => {
 };
 
 
-export default function MinimalBecomeBackerPage() {
+export default function BecomeBackerPage() {
   const { address: connectedAddress, isConnected } = useAccount();
+  const { data: session, status: sessionStatus } = useSession();
   const publicClient = usePublicClient();
+  const { scoreData, isFetchingScore, fetchScoreError, refreshScore } = useGitHubScore();
 
-  const [manualBackerScoreInput, setManualBackerScoreInput] = useState('');
-  const [processedBackerScore, setProcessedBackerScore] = useState(0);
   const [isEligibleBacker, setIsEligibleBacker] = useState(false);
-  const [githubUsernameForMetadata, setGithubUsernameForMetadata] = useState('');
-
   const [reputationRequests, setReputationRequests] = useState([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   const [errorRequests, setErrorRequests] = useState(null);
@@ -60,168 +60,90 @@ export default function MinimalBecomeBackerPage() {
   const [vouchReason, setVouchReason] = useState("Fulfilling user's reputation request.");
 
   const {
-    data: vouchHash, // This is the transaction hash from executeVouchForRequest
+    data: vouchHash,
     writeContract: executeVouchForRequest,
     reset: resetVouchContract,
-    isPending: isVouchPending, // True when the transaction is being sent to the wallet/node
-    error: vouchWriteError     // Error from sending the transaction
+    isPending: isVouchPending,
+    error: vouchWriteError
   } = useWriteContract();
-
   const {
-    isLoading: isVouchConfirming, // True while waiting for transaction confirmation (mining)
-    isSuccess: isVouchConfirmed,   // True once the transaction is confirmed
-    error: vouchReceiptError     // Error related to transaction receipt/confirmation
-  } = useWaitForTransactionReceipt({
-    hash: vouchHash, // Hook depends on vouchHash; initially undefined
-  });
-
+    isLoading: isVouchConfirming,
+    isSuccess: isVouchConfirmed,
+    error: vouchReceiptError
+  } = useWaitForTransactionReceipt({ hash: vouchHash });
   const [vouchFormMessage, setVouchFormMessage] = useState(null);
   const [vouchFormError, setVouchFormError] = useState(null);
 
+  const actualMinScoreThreshold = MIN_GITHUB_SCORE_CONTRACT / 10.0;
 
-  const handleScoreInputChange = (e) => {
-    setManualBackerScoreInput(e.target.value);
-  };
-
-  const handleSetScoreAndEligibility = () => {
-    const score = parseInt(manualBackerScoreInput);
-    if (!isNaN(score) && score >= 0) {
-        setProcessedBackerScore(score);
-        setIsEligibleBacker(score >= MIN_GITHUB_SCORE_CONTRACT);
-        if (score < MIN_GITHUB_SCORE_CONTRACT) {
-            alert(`Score ${score} is below the minimum of ${MIN_GITHUB_SCORE_CONTRACT} required to be a backer.`);
-        }
+  useEffect(() => {
+    if (scoreData && typeof scoreData.totalScore === 'number') {
+        setIsEligibleBacker(scoreData.totalScore >= actualMinScoreThreshold);
     } else {
-        alert("Please enter a valid non-negative number for the score.");
         setIsEligibleBacker(false);
-        setProcessedBackerScore(0);
     }
-  };
+  }, [scoreData, actualMinScoreThreshold]);
+
+  useEffect(() => {
+    if (sessionStatus === 'authenticated' && session?.user?.githubUsername && !scoreData && !isFetchingScore) {
+      refreshScore(session.user.githubUsername);
+    }
+  }, [sessionStatus, session, scoreData, isFetchingScore, refreshScore]);
 
   const { data: requestCounterData, refetch: refetchRequestCounter } = useReadContract({
-    address: REPUFI_SBT_CONTRACT_ADDRESS,
-    abi: REPUFI_SBT_ABI,
+    address: REPUFI_SBT_CONTRACT_ADDRESS, abi: REPUFI_SBT_ABI,
     functionName: 'reputationRequestCounter',
     query: { enabled: isConnected && isEligibleBacker }
   });
 
-   const fetchAllOpenReputationRequests = useCallback(async () => {
-    console.log("Attempting to fetch reputation requests...");
-    if (!publicClient) {
-        setErrorRequests("Web3 provider (publicClient) is not available.");
-        setIsLoadingRequests(false); return;
+  const fetchAllOpenReputationRequests = useCallback(async () => {
+    if (!publicClient || requestCounterData === undefined || !isEligibleBacker) {
+        setReputationRequests([]); return;
     }
-    if (requestCounterData === undefined) {
-        setErrorRequests("Reputation request counter not yet loaded."); return;
-    }
-    if (!isEligibleBacker) {
-        setErrorRequests("Not eligible to view requests.");
-        setReputationRequests([]); setIsLoadingRequests(false); return;
-    }
-
     setIsLoadingRequests(true); setErrorRequests(null);
     setReputationRequests([]);
-
     const totalRequests = Number(requestCounterData);
-    console.log("Parsed Total Requests (from counter):", totalRequests);
     if (totalRequests === 0) {
-        console.log("No requests to fetch (counter is 0).");
         setIsLoadingRequests(false); return;
     }
-
     const fetchedRequestsArray = [];
-    let successfulFetches = 0;
-
     try {
         for (let i = totalRequests; i >= 1; i--) {
-            if (fetchedRequestsArray.length >= 30 && i < totalRequests - 60) {
-                console.log(`Optimization: Reached fetch limit, stopping early.`); break;
-            }
-
+            if (fetchedRequestsArray.length >= 30 && i < totalRequests - 60) break;
             try {
-                const rawReqDetailsArray = await publicClient.readContract({ // Renamed to rawReqDetailsArray
-                    address: REPUFI_SBT_CONTRACT_ADDRESS,
-                    abi: REPUFI_SBT_ABI,
-                    functionName: 'reputationRequests',
-                    args: [BigInt(i)]
+                const rawReqDetailsArray = await publicClient.readContract({
+                    address: REPUFI_SBT_CONTRACT_ADDRESS, abi: REPUFI_SBT_ABI,
+                    functionName: 'reputationRequests', args: [BigInt(i)]
                 });
-
-                console.log(`RAW details Array for Request ID ${i}:`, JSON.stringify(rawReqDetailsArray, (key, value) =>
-                    typeof value === 'bigint' ? value.toString() : value, 2
-                ));
-
-                // Destructure or access by index based on your Solidity struct order
-                if (!rawReqDetailsArray || rawReqDetailsArray.length < 9) { // Basic check for array structure
-                    console.warn(`Skipping Request ID ${i}: Invalid data structure returned from contract.`);
-                    continue;
-                }
-
-                const [
-                    borrower,       // Index 0
-                    requestType,    // Index 1
-                    description,    // Index 2
-                    duration,       // Index 3 (bigint)
-                    timestamp,      // Index 4 (bigint)
-                    metadataCID,    // Index 5
-                    fulfilled,      // Index 6 (boolean)
-                    githubScore,    // Index 7 (bigint)
-                    borrowerStake   // Index 8 (bigint)
+                if (!rawReqDetailsArray || rawReqDetailsArray.length < 9) { continue; }
+                const [ borrower, requestTypeStr, descriptionStr, durationBigInt, timestampBigInt,
+                        metadataCIDStr, fulfilledBool, githubScoreBigInt, borrowerStakeBigInt
                 ] = rawReqDetailsArray;
 
-                // Now perform checks using the destructured variables
-                if (
-                    borrower && typeof borrower === 'string' && borrower !== "0x0000000000000000000000000000000000000000" &&
-                    typeof fulfilled === 'boolean' && !fulfilled &&
-                    githubScore !== undefined && duration !== undefined && borrowerStake !== undefined
-                ) {
-                    let ipfsMetadata = { name: `Request #${i}`, description: "Metadata loading or unavailable." };
-                    if (metadataCID && typeof metadataCID === 'string' && metadataCID.trim() !== '') {
-                        try {
-                            ipfsMetadata = await fetchFromIPFS(metadataCID);
-                        } catch (ipfsError) {
-                            console.warn(`IPFS fetch error for CID ${metadataCID} (Request ID ${i}):`, ipfsError.message);
-                        }
+                if (borrower && typeof borrower === 'string' && borrower !== "0x0000000000000000000000000000000000000000" &&
+                    typeof fulfilledBool === 'boolean' && !fulfilledBool) {
+                    let ipfsMetadata = { name: `Request #${i}`, description: "Metadata loading..." };
+                    if (metadataCIDStr && typeof metadataCIDStr === 'string' && metadataCIDStr.trim() !== '') {
+                        try { ipfsMetadata = await fetchFromIPFS(metadataCIDStr); }
+                        catch (e) { console.warn("IPFS error:", e); }
                     }
-
                     fetchedRequestsArray.push({
-                        id: i,
-                        borrower: borrower,
-                        requestType: requestType || "N/A",
-                        description: description || "N/A",
-                        duration: Number(duration),
-                        timestamp: Number(timestamp),
-                        metadataCID: metadataCID || "",
-                        fulfilled: fulfilled,
-                        githubScore: Number(githubScore),
-                        borrowerStake: borrowerStake, // Keep as bigint
+                        id: i, borrower, requestType: requestTypeStr || "N/A", description: descriptionStr || "N/A",
+                        duration: Number(durationBigInt), timestamp: Number(timestampBigInt), metadataCID: metadataCIDStr || "",
+                        fulfilled: fulfilledBool, githubScore: Number(githubScoreBigInt), borrowerStake: borrowerStakeBigInt,
                         metadata: ipfsMetadata
                     });
-                    successfulFetches++;
-                } else {
-                    console.log(`Skipping Request ID ${i} after destructuring: Not valid, already fulfilled, or zero address borrower. Fulfilled: ${fulfilled}, Borrower: ${borrower}`);
                 }
-            } catch (readError) {
-                console.warn(`Error reading contract for Request ID ${i}:`, readError.message, readError.stack);
-            }
+            } catch (e) { console.warn(`Could not fetch req ID ${i}:`, e.message); }
         }
         setReputationRequests(fetchedRequestsArray);
-        if (fetchedRequestsArray.length === 0 && totalRequests > 0) {
-            console.log("Fetched 0 valid, unfulfilled requests. All might be fulfilled or invalid based on contract data.");
-        }
-    } catch (mainLoopError) {
-        console.error("Error during the main loop of fetching requests:", mainLoopError);
-        setErrorRequests(`Failed to load all reputation requests: ${mainLoopError.message}`);
-    } finally {
-        setIsLoadingRequests(false);
-        console.log("Finished fetching requests. Found valid & unfulfilled:", fetchedRequestsArray.length);
-    }
-  }, [publicClient, requestCounterData, isEligibleBacker, REPUFI_SBT_CONTRACT_ADDRESS, REPUFI_SBT_ABI]);
+    } catch (err) { setErrorRequests(`Failed to load requests: ${err.message}`);
+    } finally { setIsLoadingRequests(false); }
+  }, [publicClient, requestCounterData, isEligibleBacker, REPUFI_SBT_ABI, REPUFI_SBT_CONTRACT_ADDRESS]);
 
   useEffect(() => {
     if (isConnected && isEligibleBacker && requestCounterData !== undefined) {
         fetchAllOpenReputationRequests();
-    } else if (!isEligibleBacker) {
-        setReputationRequests([]);
     }
   }, [isConnected, isEligibleBacker, requestCounterData, fetchAllOpenReputationRequests]);
 
@@ -237,79 +159,58 @@ export default function MinimalBecomeBackerPage() {
     e.preventDefault();
     setVouchFormError(null); setVouchFormMessage(null); resetVouchContract();
 
-    if (!selectedRequest || !selectedRequest.borrower || !isAddress(selectedRequest.borrower)) {
-        setVouchFormError("Invalid or no reputation request selected."); return;
+    if (!selectedRequest || !isAddress(selectedRequest.borrower) || !connectedAddress || !scoreData) {
+        setVouchFormError("Required data missing (wallet, request, or your GitHub score)."); return;
     }
-    if (!connectedAddress) {
-        setVouchFormError("Wallet not connected."); return;
-    }
-    if (!backerStakeAmount || !backerStakeAmount.trim()) {
-        setVouchFormError('Your stake amount is required.'); return;
-    }
-    const parsedStakeAmount = parseFloat(backerStakeAmount);
-    if (isNaN(parsedStakeAmount) || parsedStakeAmount <= 0) {
+    if (!backerStakeAmount || !backerStakeAmount.trim() || parseFloat(backerStakeAmount) <= 0 || isNaN(parseFloat(backerStakeAmount))) {
         setVouchFormError('Your stake amount must be a positive number.'); return;
     }
     if (selectedRequest.borrower.toLowerCase() === connectedAddress.toLowerCase()) {
         setVouchFormError("You cannot vouch for yourself."); return;
     }
-    if (!isEligibleBacker || processedBackerScore < MIN_GITHUB_SCORE_CONTRACT) {
-        setVouchFormError("Your processed score does not meet the minimum requirement to be a backer."); return;
+    if (!isEligibleBacker) {
+        setVouchFormError("Your GitHub score does not meet the minimum to be a backer."); return;
     }
 
     setVouchFormMessage("Preparing to vouch...");
     try {
-        const stakeInWei = parseEther(backerStakeAmount); // This must be a valid number string
+        const stakeInWei = parseEther(backerStakeAmount);
         const vouchMetadata = {
-            name: `RepuFi Vouch: ${githubUsernameForMetadata || connectedAddress.substring(0,6)} for ${selectedRequest.borrower.substring(0,8)}`,
-            description: `Vouch by Backer ${connectedAddress} (Provided Score: ${processedBackerScore}, GitHub Claim: ${githubUsernameForMetadata || 'N/A'}) for Borrower ${selectedRequest.borrower}, fulfilling Request #${selectedRequest.id}. Reason: ${vouchReason}`,
+            name: `RepuFi Vouch: ${scoreData.username} for ${selectedRequest.borrower.substring(0,8)}...`,
+            description: `Vouch by Backer ${connectedAddress} (GitHub: ${scoreData.username}) for Borrower ${selectedRequest.borrower}, fulfilling Request #${selectedRequest.id}. Reason: ${vouchReason}`,
             image: getDefaultSbtSvgImageClientSide(),
             attributes: [
               { trait_type: "Vouch Type", value: "Fulfilling Reputation Request" },
               { trait_type: "Original Request ID", value: selectedRequest.id.toString() },
               { trait_type: "Backer Address", value: connectedAddress },
-              { trait_type: "Backer Claimed GitHub Username", value: githubUsernameForMetadata || "Not Provided" },
-              { trait_type: "Backer Provided Score", value: processedBackerScore.toString() },
+              { trait_type: "Backer GitHub Username", value: scoreData.username },
+              { trait_type: "Backer GitHub Score (at vouch)", value: scoreData.totalScore.toFixed(1) },
               { trait_type: "Borrower Address", value: selectedRequest.borrower },
-              { trait_type: "Borrower GitHub Score (at request time)", value: (selectedRequest.githubScore !== undefined && selectedRequest.githubScore !== null) ? Number(selectedRequest.githubScore).toString() : "N/A" },
+              { trait_type: "Borrower GitHub Score (at request)", value: (selectedRequest.githubScore / 10).toFixed(1) },
               { trait_type: "Stake Amount (PAS)", value: backerStakeAmount },
-              { trait_type: "Vouch Duration (Days)", value: (selectedRequest.duration !== undefined && selectedRequest.duration !== null) ? (Number(selectedRequest.duration) / (24*60*60)).toFixed(0) : "N/A" },
+              { trait_type: "Vouch Duration (Days)", value: (Number(selectedRequest.duration) / (24*60*60)).toFixed(0) },
               { trait_type: "Backer's Reason/Note", value: vouchReason },
             ],
         };
         const metadataCIDForVouchSBT = await uploadJsonToIPFS(vouchMetadata);
         if (!metadataCIDForVouchSBT) {
-            setVouchFormError("Failed to upload metadata to IPFS. Cannot proceed.");
-            setVouchFormMessage(null); return;
+            setVouchFormError("Failed to upload metadata to IPFS."); setVouchFormMessage(null); return;
         }
         setVouchFormMessage(`Vouch metadata uploaded. Submitting transaction...`);
-
-        const borrowerArg = selectedRequest.borrower;
-        const metadataCIDArg = metadataCIDForVouchSBT;
-
-        console.log("Calling vouchForRequest with args:", {
-            borrower: borrowerArg,
-            metadataCID: metadataCIDArg,
-            value: stakeInWei.toString()
-        });
-
         executeVouchForRequest({
-            address: REPUFI_SBT_CONTRACT_ADDRESS,
-            abi: REPUFI_SBT_ABI,
+            address: REPUFI_SBT_CONTRACT_ADDRESS, abi: REPUFI_SBT_ABI,
             functionName: 'vouchForRequest',
-            args: [borrowerArg, metadataCIDArg],
-            value: stakeInWei,
+            args: [selectedRequest.borrower, metadataCIDForVouchSBT], value: stakeInWei,
         });
     } catch (err) {
         console.error("Vouch for request error:", err);
         setVouchFormError(`Error: ${err.message || "An error occurred during preparation."}`);
         setVouchFormMessage(null);
-    }
+     }
   };
 
    useEffect(() => {
-    // This effect depends on isVouchConfirmed, vouchWriteError, and vouchReceiptError
-    if (isVouchConfirmed) { // isVouchConfirmed IS DEFINED and comes from useWaitForTransactionReceipt
+    if (isVouchConfirmed) {
       setVouchFormMessage('Successfully vouched for request! Transaction confirmed.');
       setVouchFormError(null);
       refetchRequestCounter().then(() => fetchAllOpenReputationRequests());
@@ -317,7 +218,51 @@ export default function MinimalBecomeBackerPage() {
     }
     if (vouchWriteError) { setVouchFormError(`Tx Error: ${vouchWriteError.shortMessage || vouchWriteError.message}`); setVouchFormMessage(null); }
     if (vouchReceiptError) { setVouchFormError(`Confirm Error: ${vouchReceiptError.shortMessage || vouchReceiptError.message}`); setVouchFormMessage(null); }
-  }, [isVouchConfirmed, vouchWriteError, vouchReceiptError, fetchAllOpenReputationRequests, refetchRequestCounter]); // Dependencies are correct
+  }, [isVouchConfirmed, vouchWriteError, vouchReceiptError, fetchAllOpenReputationRequests, refetchRequestCounter]);
+
+
+  const renderUserStatusAndEligibility = () => {
+    if (sessionStatus === 'loading' && !scoreData) return <div className="card p-6 text-center"><Loader2 className="mr-2 h-6 w-6 animate-spin inline-block" />Loading User Session...</div>;
+    if (isFetchingScore) return <div className="card p-6 text-center"><Loader2 className="mr-2 h-6 w-6 animate-spin inline-block" />Analyzing your GitHub profile ({session?.user?.githubUsername || 'previous'})...</div>;
+    if (fetchScoreError) return <div className="card p-6 text-center text-red-500"><AlertTriangle className="mx-auto h-8 w-8 mb-2"/>Error fetching score: {fetchScoreError} <button onClick={() => refreshScore(session?.user?.githubUsername)} className="ml-1 text-primary underline text-xs font-semibold">(Retry)</button></div>;
+
+    if (sessionStatus === 'unauthenticated') {
+        return (
+            <div className="card p-8 text-center max-w-md mx-auto">
+                <Github className="h-12 w-12 mx-auto text-primary opacity-70 mb-4" />
+                <h3 className="text-xl font-semibold mb-2">GitHub Login Required</h3>
+                <p className="text-slate-600 dark:text-slate-400 mb-4">
+                    To become a backer, please log in with GitHub (via the header button) so your profile score can be analyzed for eligibility.
+                </p>
+                <Button onClick={() => signIn('github')} className="btn-secondary">
+                    <Github className="mr-2 h-5 w-5"/> Login with GitHub
+                </Button>
+            </div>
+        );
+    }
+
+    if (scoreData && typeof scoreData.totalScore === 'number') {
+      return (
+        <div className={`card p-6 text-center ${isEligibleBacker ? 'border-l-4 border-green-500' : 'border-l-4 border-red-500'}`}>
+          <h2 className="text-xl font-semibold mb-2">Your Backer Eligibility</h2>
+          <p className="font-medium">GitHub Profile: {scoreData.username}</p>
+          <p>Analyzed Score: <strong className="text-2xl">{scoreData.totalScore.toFixed(1)}</strong> / 10</p>
+          {isEligibleBacker ?
+            <p className="mt-2 text-sm text-green-700 dark:text-green-300 flex items-center justify-center gap-1"><CheckCircle2 size={16}/>You are eligible to be a backer! View open requests below.</p> :
+            <p className="mt-2 text-sm text-red-700 dark:text-red-300 flex items-center justify-center gap-1"><ShieldAlert size={16}/>Your score is below {actualMinScoreThreshold.toFixed(1)}. You cannot currently act as a backer. Consider <Link href="/request-reputation" className="ml-1 font-semibold hover:underline">requesting a vouch</Link>.</p>
+          }
+          {scoreData.isOverridden && <p className="text-xs italic mt-1">Note: Your displayed score is manually overridden.</p>}
+        </div>
+      );
+    }
+    return (
+        <div className="card p-4 text-center text-slate-500 dark:text-slate-400">
+            <Info size={20} className="mx-auto mb-2 opacity-70" />
+            Your GitHub score from context is not yet available. If you've just logged in, please wait a moment.
+            The score should appear in the header. If not, try refreshing the page or logging in with GitHub again via the header.
+        </div>
+    );
+  };
 
 
   if (!isConnected) {
@@ -325,11 +270,8 @@ export default function MinimalBecomeBackerPage() {
       <div className="card p-8 text-center max-w-md mx-auto my-10 animate-fadeIn">
         <LockKeyhole className="h-16 w-16 mx-auto text-primary opacity-70 mb-6" />
         <h2 className="text-2xl font-semibold text-foreground mb-3">Connect Wallet</h2>
-        <p className="text-slate-600 dark:text-slate-400 mb-6">Connect your wallet to become a backer.</p>
+        <p className="text-slate-600 dark:text-slate-400 mb-6">Connect your wallet to view requests and become a backer.</p>
         <div className="flex justify-center"><ConnectButton /></div>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-6">
-          Ensure you are on the PassetHub Testnet.
-        </p>
       </div>
     );
   }
@@ -337,56 +279,11 @@ export default function MinimalBecomeBackerPage() {
   return (
     <div className="space-y-10 pb-12">
       <header className="text-center pt-4">
-        <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">Become a RepuFi Backer (Test Mode)</h1>
-        <p className="text-lg text-slate-600 dark:text-slate-300 max-w-3xl mx-auto">
-          Enter your GitHub score. If it's {MIN_GITHUB_SCORE_CONTRACT} or higher, you can view and fulfill reputation requests.
-        </p>
+        <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">Become a RepuFi Backer</h1>
+        
       </header>
 
-      <div className="card p-6 shadow-lg max-w-lg mx-auto">
-        <h2 className="text-xl font-semibold mb-4 text-center">1. Set Your Backer Score</h2>
-        <div className="space-y-4">
-            <div>
-                <label htmlFor="manualBackerScoreInput" className="block text-sm font-medium text-foreground mb-1.5">
-                    Enter Your Score (Contract MIN_GITHUB_SCORE is {MIN_GITHUB_SCORE_CONTRACT}):
-                </label>
-                <Input
-                    type="number"
-                    id="manualBackerScoreInput"
-                    value={manualBackerScoreInput}
-                    onChange={handleScoreInputChange}
-                    placeholder={`e.g., 70, 75 (must be >= ${MIN_GITHUB_SCORE_CONTRACT})`}
-                    className="input"
-                />
-            </div>
-            <div>
-                <label htmlFor="githubUsernameForMetadata" className="block text-sm font-medium text-foreground mb-1.5">
-                    Your GitHub Username (Optional, for Vouch Metadata):
-                </label>
-                <Input
-                    type="text"
-                    id="githubUsernameForMetadata"
-                    value={githubUsernameForMetadata}
-                    onChange={(e) => setGithubUsernameForMetadata(e.target.value)}
-                    placeholder="your-github-id"
-                    className="input"
-                />
-            </div>
-            <Button onClick={handleSetScoreAndEligibility} className="btn-primary w-full !py-2.5">
-                Set Score & Check Eligibility
-            </Button>
-        </div>
-
-        {processedBackerScore > 0 && (
-            <div className={`mt-4 p-3 rounded-md text-center text-sm ${isEligibleBacker ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'}`}>
-                {isEligibleBacker ?
-                    <p className="flex items-center justify-center gap-1.5"><CheckCircle2 size={18}/>Eligible! Your Score: {processedBackerScore}. You can view requests below.</p> :
-                    <p className="flex items-center justify-center gap-1.5"><ShieldAlert size={18}/>Not Eligible. Your Score: {processedBackerScore}. Minimum required is {MIN_GITHUB_SCORE_CONTRACT}.</p>
-                }
-            </div>
-        )}
-      </div>
-
+      {renderUserStatusAndEligibility()}
 
       {isEligibleBacker && (
         <section className="card p-6 sm:p-8 animate-fadeIn shadow-xl mt-8">
@@ -411,9 +308,10 @@ export default function MinimalBecomeBackerPage() {
             {reputationRequests.length > 0 && (
                 <div className="space-y-5">
                     {reputationRequests.map(req => {
-                        const displayDurationDays = req.duration && !isNaN(Number(req.duration)) ? (Number(req.duration) / (24*60*60)).toFixed(0) : "N/A";
-                        const displayGithubScore = req.githubScore && !isNaN(Number(req.githubScore)) ? Number(req.githubScore).toString() : "N/A";
-                        const displayBorrowerStake = typeof req.borrowerStake === 'bigint' ? formatEther(req.borrowerStake) : "N/A";
+                        const displayDurationDays = (req.duration && !isNaN(Number(req.duration))) ? (Number(req.duration) / (24*60*60)).toFixed(0) : "N/A";
+                        // req.githubScore is the scaled score from contract (e.g., 65 if actual was 6.5)
+                        const displayRequesterActualScore = (req.githubScore && !isNaN(Number(req.githubScore))) ? (Number(req.githubScore) / 10).toFixed(1) : "N/A";
+                        const displayBorrowerStake = (typeof req.borrowerStake === 'bigint') ? formatEther(req.borrowerStake) : "N/A";
 
                         return (
                             <div key={req.id} className="p-4 rounded-lg bg-background border border-border shadow-md hover:shadow-lg transition-shadow">
@@ -424,9 +322,9 @@ export default function MinimalBecomeBackerPage() {
                                             By: <span className="font-mono">{req.borrower || "N/A"}</span>
                                         </p>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Requester's GitHub Score (provided to contract): <span className="font-semibold">{displayGithubScore}</span>
+                                            Requester's GitHub Score (0-10 scale): <span className="font-semibold">{displayRequesterActualScore}</span>
                                         </p>
-                                         <p className="text-sm mt-2 text-foreground break-words">{req.metadata?.description || req.description || "No description provided."}</p>
+                                         <p className="text-sm mt-2 text-foreground break-words max-h-20 overflow-y-auto">{req.metadata?.description || req.description || "No description provided."}</p>
                                     </div>
                                     <Button onClick={() => handleOpenVouchModal(req)} className="btn-secondary text-sm w-full sm:w-auto mt-2 sm:mt-0 whitespace-nowrap">
                                         <UserPlus size={16} className="mr-1.5"/> Vouch
@@ -454,7 +352,7 @@ export default function MinimalBecomeBackerPage() {
                             <br/>Request Type: <strong>{selectedRequest.requestType || "N/A"}</strong>
                         </p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">Duration: {selectedRequest.duration && !isNaN(Number(selectedRequest.duration)) ? (Number(selectedRequest.duration)/(24*60*60)).toFixed(0) : 'N/A'} days</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Requester's Provided Score: {selectedRequest.githubScore && !isNaN(Number(selectedRequest.githubScore)) ? Number(selectedRequest.githubScore).toString() : "N/A"}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Requester's Provided Score (Contract Value): {selectedRequest.githubScore && !isNaN(Number(selectedRequest.githubScore)) ? Number(selectedRequest.githubScore).toString() : "N/A"}</p>
                     </div>
                     <div>
                         <label htmlFor="backerStakeAmountModal" className="block text-sm font-medium mb-1">Your Stake Amount (PAS) <span className="text-red-500">*</span></label>
